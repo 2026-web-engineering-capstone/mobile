@@ -1,7 +1,8 @@
 import { Text, View } from 'react-native';
+import type { SubwayLineTheme } from '@/features/home/types';
 
 type StationSelectorProps = {
-  lineLabel: string;
+  line: SubwayLineTheme;
   currentStation: string;
   previousStation: string;
   nextStation: string;
@@ -9,23 +10,29 @@ type StationSelectorProps = {
 
 export function StationSelector({
   currentStation,
-  lineLabel,
+  line,
   nextStation,
   previousStation,
 }: StationSelectorProps) {
   return (
-    <View className="relative h-11 flex-row items-center justify-between rounded-full bg-[#759cce] px-3">
-      <Text className="text-[14px] text-white">{previousStation}</Text>
-      <Text className="text-[14px] text-white">{nextStation}</Text>
+    <View
+      className="relative h-12 flex-row items-center justify-between rounded-full px-4"
+      style={{ backgroundColor: line.colors.soft }}
+    >
+      <Text className="text-sm text-white">{previousStation}</Text>
+      <Text className="text-sm text-white">{nextStation}</Text>
 
       <View
-        className="absolute top-0 h-11 w-40 flex-row items-center justify-center rounded-full border-[4px] border-[#759cce] bg-white"
-        style={{ left: '50%', marginLeft: -80 }}
+        className="absolute left-1/2 top-0 h-12 w-40 -translate-x-1/2 flex-row items-center justify-center rounded-full border-4 bg-white"
+        style={{ borderColor: line.colors.soft }}
       >
-        <View className="mr-2 h-5 w-5 items-center justify-center rounded-full bg-[#759cce]">
-          <Text className="text-[12px] font-semibold text-white">{lineLabel}</Text>
+        <View
+          className="mr-2 h-5 w-5 items-center justify-center rounded-full"
+          style={{ backgroundColor: line.colors.soft }}
+        >
+          <Text className="text-xs font-semibold text-white">{line.label}</Text>
         </View>
-        <Text className="text-[16px] font-semibold tracking-[-0.4px] text-[#111111]">
+        <Text className="text-base font-semibold tracking-tight text-black">
           {currentStation}
         </Text>
       </View>

@@ -15,15 +15,15 @@ export function SectionCard({
   title,
 }: SectionCardProps) {
   return (
-    <Card variant="default" className="rounded-[30px] px-5 py-5">
+    <Card variant="default" className="rounded-3xl px-5 py-5">
       <Card.Body className="gap-4">
         <View className="gap-1">
           {eyebrow ? (
-            <Text className="text-xs font-semibold uppercase tracking-[2.5px] text-accent">
+            <Text className="text-xs font-semibold uppercase tracking-widest text-accent">
               {eyebrow}
             </Text>
           ) : null}
-          <Card.Title className="text-[30px] leading-9 text-surface-foreground">
+          <Card.Title className="text-3xl leading-9 text-surface-foreground">
             {title}
           </Card.Title>
           {description ? (

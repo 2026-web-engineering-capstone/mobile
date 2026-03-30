@@ -9,25 +9,25 @@ type ArrivalRow = {
 type ArrivalCardProps = {
   title: string;
   rows: ArrivalRow[];
-  width: number;
+  etaColor?: string;
 };
 
-export function ArrivalCard({ rows, title, width }: ArrivalCardProps) {
+export function ArrivalCard({ rows, title, etaColor }: ArrivalCardProps) {
   return (
-    <Card
-      className="rounded-[6px] border border-[#e3e3e3] bg-white shadow-none"
-      style={{ width }}
-    >
-      <Card.Body className="gap-3 px-3 py-3">
-        <Text className="text-[14px] font-bold text-[#111111]">{title}</Text>
+    <Card className="min-w-0 flex-1 rounded-lg border border-[#e3e3e3] bg-white shadow-none">
+      <Card.Body className="gap-3">
+        <Text className="text-sm font-bold leading-5 text-black">{title}</Text>
         <Separator />
         {rows.map((row) => (
           <View
             key={`${title}-${row.destination}-${row.eta}`}
             className="flex-row items-center justify-between"
           >
-            <Text className="text-[12px] text-[#8a8a8a]">{row.destination}</Text>
-            <Text className="text-[12px] font-medium text-[#759cce]">
+            <Text className="shrink text-xs text-[#8a8a8a]">{row.destination}</Text>
+            <Text
+              className="ml-3 text-xs font-medium"
+              style={etaColor ? { color: etaColor } : undefined}
+            >
               {row.eta}
             </Text>
           </View>

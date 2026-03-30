@@ -28,7 +28,7 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
               key={item}
               className="rounded-2xl bg-surface-secondary px-4 py-3"
             >
-              <Text className="text-xs font-semibold uppercase tracking-[2px] text-accent">
+              <Text className="text-xs font-semibold uppercase tracking-wider text-accent">
                 Step {index + 1}
               </Text>
               <Text className="mt-1 text-base font-medium text-surface-secondary-foreground">

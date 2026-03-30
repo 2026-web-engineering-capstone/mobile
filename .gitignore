@@ -309,6 +309,8 @@ dist
 
 .expo
 __generated__
+android/
+ios/
 
 ### ReactNative.macOS Stack ###
 # General

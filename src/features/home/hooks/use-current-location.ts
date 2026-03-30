@@ -24,6 +24,18 @@ export function useCurrentLocation(): UseCurrentLocationResult {
     let subscription: Location.LocationSubscription | null = null;
 
     async function initializeLocation() {
+      const isLocationServicesEnabled = await Location.hasServicesEnabledAsync();
+
+      if (!isLocationServicesEnabled) {
+        if (isMounted) {
+          setErrorMessage(
+            '기기의 위치 서비스가 꺼져 있어 현재 위치를 확인할 수 없습니다.',
+          );
+          setIsLoading(false);
+        }
+        return;
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
@@ -39,6 +51,7 @@ export function useCurrentLocation(): UseCurrentLocationResult {
       });
 
       if (isMounted) {
+        setErrorMessage(null);
         setCurrentLocation({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
@@ -61,6 +74,7 @@ export function useCurrentLocation(): UseCurrentLocationResult {
             latitude: nextLocation.coords.latitude,
             longitude: nextLocation.coords.longitude,
           });
+          setErrorMessage(null);
         },
       );
     }

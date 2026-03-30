@@ -1,14 +1,18 @@
 import { Text, View } from 'react-native';
+import type { SubwayLineTheme } from '@/features/home/types';
 
 type StationLineIconProps = {
-  lineLabel: string;
+  line: SubwayLineTheme;
 };
 
-export function StationLineIcon({ lineLabel }: StationLineIconProps) {
+export function StationLineIcon({ line }: StationLineIconProps) {
   return (
-    <View className="h-10 w-10 items-center justify-center rounded-[10px] bg-[#f5f5f5]">
-      <View className="h-[22px] w-[22px] items-center justify-center rounded-full bg-[#759cce]">
-        <Text className="text-[13px] font-semibold text-white">{lineLabel}</Text>
+    <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#f5f5f5]">
+      <View
+        className="h-5 w-5 items-center justify-center rounded-full"
+        style={{ backgroundColor: line.colors.soft }}
+      >
+        <Text className="text-xs font-semibold text-white">{line.label}</Text>
       </View>
     </View>
   );

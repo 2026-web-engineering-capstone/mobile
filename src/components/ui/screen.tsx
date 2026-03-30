@@ -26,7 +26,7 @@ export function Screen({ children, title, subtitle }: ScreenProps) {
       >
         <View className="gap-4">
           <View className="gap-2">
-            <Text className="text-xs font-semibold uppercase tracking-[2.5px] text-accent">
+            <Text className="text-xs font-semibold uppercase tracking-widest text-accent">
               GYOUM
             </Text>
             <Text className="text-3xl font-bold tracking-tight text-foreground">

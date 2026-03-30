@@ -1,9 +1,4 @@
-import {
-  Dimensions,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
@@ -14,38 +9,22 @@ import { Header } from '@/features/home/components/header';
 import { MapSection } from '@/features/home/components/map-section';
 import { StationLineIcon } from '@/features/home/components/station-line-icon';
 import { StationSelector } from '@/features/home/components/station-selector';
+import type { StationInfo } from '@/features/home/types';
 
-const HORIZONTAL_PADDING = 18;
-const CARD_GAP = 10;
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const ARRIVAL_CARD_WIDTH =
-  (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
-
-const STATION = {
+const STATION: StationInfo = {
   latitude: 37.3864,
   longitude: 126.6393,
-  lineLabel: '인',
   name: '인천대입구역',
   previous: '지식정보단지',
   next: '센트럴파크',
+  line: {
+    label: '인',
+    colors: {
+      primary: '#3681cb',
+      soft: '#759cce',
+    },
+  },
 };
-
-const ARRIVAL_CARDS = [
-  {
-    title: '계양 방면',
-    rows: [
-      { destination: '계양', eta: '5분' },
-      { destination: '계양', eta: '12분' },
-    ],
-  },
-  {
-    title: '송도달빛축제공원 방면',
-    rows: [
-      { destination: '송도달빛축제공원', eta: '5분' },
-      { destination: '송도달빛축제공원', eta: '12분' },
-    ],
-  },
-];
 
 const FACILITIES = [
   { label: '수유실', available: true },
@@ -69,46 +48,56 @@ export function HomeScreen() {
           paddingBottom: insets.bottom + 24,
         }}
       >
-        <View className="gap-[22px] px-[18px]">
+        <View className="gap-6 px-5">
           <Header />
           <MapSection station={STATION} />
 
-          <View className="gap-0.5">
-            <Text className="text-[20px] font-light tracking-[-0.6px] text-[#111111]">
+          <View className="gap-1">
+            <Text className="text-2xl font-light tracking-tight text-black">
               현재 도움을 요청할 수 있는 역은
             </Text>
-            <Text className="text-[20px] font-light tracking-[-0.6px] text-[#111111]">
-              <Text className="font-medium text-[#3681cb]">{STATION.name}</Text>{' '}
+            <Text className="text-2xl font-light tracking-tight text-black">
+              <Text style={{ color: STATION.line.colors.primary }} className="font-medium">
+                {STATION.name}
+              </Text>{' '}
               입니다.
             </Text>
           </View>
 
-          <StationLineIcon lineLabel={STATION.lineLabel} />
+          <StationLineIcon line={STATION.line} />
           <StationSelector
             currentStation={STATION.name.replace('역', '')}
-            lineLabel={STATION.lineLabel}
+            line={STATION.line}
             nextStation={STATION.next}
             previousStation={STATION.previous}
           />
 
-          <View className="gap-[14px]">
-            <Text className="text-[18px] font-bold tracking-[-0.6px] text-[#111111]">
+          <View className="gap-4">
+            <Text className="text-xl font-bold tracking-tight text-black">
               도착 정보
             </Text>
-            <View className="flex-row justify-between">
-              {ARRIVAL_CARDS.map((card) => (
-                <ArrivalCard
-                  key={card.title}
-                  width={ARRIVAL_CARD_WIDTH}
-                  title={card.title}
-                  rows={card.rows}
-                />
-              ))}
+            <View className="flex-row gap-3">
+              <ArrivalCard
+                title="계양 방면"
+                rows={[
+                  { destination: '계양', eta: '5분' },
+                  { destination: '계양', eta: '12분' },
+                ]}
+                etaColor={STATION.line.colors.soft}
+              />
+              <ArrivalCard
+                title="송도달빛축제공원 방면"
+                rows={[
+                  { destination: '송도달빛축제공원', eta: '5분' },
+                  { destination: '송도달빛축제공원', eta: '12분' },
+                ]}
+                etaColor={STATION.line.colors.soft}
+              />
             </View>
           </View>
 
-          <View className="gap-[14px]">
-            <Text className="text-[18px] font-bold tracking-[-0.6px] text-[#111111]">
+          <View className="gap-4">
+            <Text className="text-xl font-bold tracking-tight text-black">
               교통약자 시설
             </Text>
             <FacilitiesGrid facilities={FACILITIES} />
