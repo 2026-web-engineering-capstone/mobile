@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__manyfast__search_projects",
+      "mcp__manyfast__read_project",
+      "mcp__manyfast__read_user_flow",
+      "mcp__figma-remote-mcp__get_metadata",
+      "mcp__figma-remote-mcp__get_design_context",
+      "Bash(ls:*)"
+    ]
+  }
+}

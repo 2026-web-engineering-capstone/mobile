@@ -38,10 +38,10 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-background">
       <StatusBar style="auto" />
       <ScrollView
-        className="flex-1 bg-white"
+        className="flex-1 bg-background"
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
           paddingTop: insets.top + 10,
@@ -53,10 +53,10 @@ export function HomeScreen() {
           <MapSection station={STATION} />
 
           <View className="gap-1">
-            <Text className="text-2xl font-light tracking-tight text-black">
+            <Text className="text-2xl font-light tracking-tight text-foreground">
               현재 도움을 요청할 수 있는 역은
             </Text>
-            <Text className="text-2xl font-light tracking-tight text-black">
+            <Text className="text-2xl font-light tracking-tight text-foreground">
               <Text style={{ color: STATION.line.colors.primary }} className="font-medium">
                 {STATION.name}
               </Text>{' '}
@@ -73,7 +73,7 @@ export function HomeScreen() {
           />
 
           <View className="gap-4">
-            <Text className="text-xl font-bold tracking-tight text-black">
+            <Text className="text-xl font-bold tracking-tight text-foreground">
               도착 정보
             </Text>
             <View className="flex-row gap-3">
@@ -97,7 +97,7 @@ export function HomeScreen() {
           </View>
 
           <View className="gap-4">
-            <Text className="text-xl font-bold tracking-tight text-black">
+            <Text className="text-xl font-bold tracking-tight text-foreground">
               교통약자 시설
             </Text>
             <FacilitiesGrid facilities={FACILITIES} />

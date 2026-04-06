@@ -1,25 +1,46 @@
 import { create } from 'zustand';
 
-type SupportType = 'wheelchair' | 'visual-guide' | 'boarding-ramp';
+export type SupportType = 'wheelchair' | 'visual-guide' | 'boarding-ramp';
+
+export type MeetingPoint =
+  | 'elevator'
+  | 'gate'
+  | 'info-center'
+  | 'platform'
+  | 'other';
+
+export const SUPPORT_TYPE_LABELS: Record<SupportType, string> = {
+  wheelchair: '휠체어 발판',
+  'visual-guide': '시각 안내 동행',
+  'boarding-ramp': '승하차 보조',
+};
+
+export const MEETING_POINT_LABELS: Record<MeetingPoint, string> = {
+  elevator: '엘리베이터 앞',
+  gate: '개찰구 앞',
+  'info-center': '고객안내센터',
+  platform: '승강장',
+  other: '기타',
+};
 
 type RequestDraftState = {
   originStation: string;
   destinationStation: string;
-  meetingPoint: string;
+  meetingPoint: MeetingPoint;
   notes: string;
   supportTypes: SupportType[];
   setOriginStation: (value: string) => void;
   setDestinationStation: (value: string) => void;
-  setMeetingPoint: (value: string) => void;
+  setMeetingPoint: (value: MeetingPoint) => void;
   setNotes: (value: string) => void;
   toggleSupportType: (value: SupportType) => void;
   reset: () => void;
 };
 
 const initialState = {
-  originStation: '시청역',
-  destinationStation: '서울역',
-  meetingPoint: '고객안내센터 앞',
+  originStation: '인천대입구역',
+  destinationStation: '센트럴파크역',
+  meetingPoint: 'elevator' as MeetingPoint,
   notes: '',
   supportTypes: ['wheelchair'] as SupportType[],
 };

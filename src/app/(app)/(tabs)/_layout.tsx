@@ -12,7 +12,7 @@ function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#006FEE',
+        tabBarActiveTintColor: isDark ? '#6aafe0' : '#3681cb',
         tabBarInactiveTintColor: isDark ? '#a1a1aa' : '#6b7280',
         tabBarIconStyle: {
           marginBottom: 0,
@@ -30,7 +30,7 @@ function TabsLayout() {
           paddingTop: 6,
           paddingHorizontal: 8,
           paddingBottom: Math.max(insets.bottom, 8),
-          backgroundColor: isDark ? '#09090b' : '#ffffff',
+          backgroundColor: isDark ? '#18181b' : '#ffffff',
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: isDark
             ? 'rgba(255, 255, 255, 0.1)'

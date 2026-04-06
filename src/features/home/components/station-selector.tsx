@@ -23,7 +23,7 @@ export function StationSelector({
       <Text className="text-sm text-white">{nextStation}</Text>
 
       <View
-        className="absolute left-1/2 top-0 h-12 w-40 -translate-x-1/2 flex-row items-center justify-center rounded-full border-4 bg-white"
+        className="absolute left-1/2 top-0 h-12 w-40 -translate-x-1/2 flex-row items-center justify-center rounded-full border-4 bg-background"
         style={{ borderColor: line.colors.soft }}
       >
         <View
@@ -32,7 +32,7 @@ export function StationSelector({
         >
           <Text className="text-xs font-semibold text-white">{line.label}</Text>
         </View>
-        <Text className="text-base font-semibold tracking-tight text-black">
+        <Text className="text-base font-semibold tracking-tight text-foreground">
           {currentStation}
         </Text>
       </View>

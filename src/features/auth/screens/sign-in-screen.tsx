@@ -1,13 +1,22 @@
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
-import { Screen } from '@/components/ui/screen';
-import { SectionCard } from '@/components/ui/section-card';
+import { Card } from 'heroui-native/card';
+import { Separator } from 'heroui-native/separator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
+
+const FEATURES = [
+  { icon: '🚇', title: '빠른 지원 요청', desc: '출발역·도착역만 선택하면 끝' },
+  { icon: '📍', title: '실시간 상태 확인', desc: '접수부터 하차까지 타임라인 안내' },
+  { icon: '♿', title: '맞춤 접근성', desc: '큰 글씨·고대비 모드 지원' },
+];
 
 export function SignInScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const handleSignIn = () => {
     signIn();
@@ -15,24 +24,68 @@ export function SignInScreen() {
   };
 
   return (
-    <Screen
-      title="교움"
-      subtitle="교통약자의 지하철 이동을 역과 연결해 주는 지원 요청 앱"
-    >
-      <View className="gap-4">
-        <SectionCard
-          eyebrow="Access"
-          title="빠르게 요청하고, 기다림은 짧게"
-          description="지원 요청, 상태 확인, 역무원 연결 흐름을 Expo Router 기준으로 먼저 잡아둔 초기 앱 구조입니다."
-        >
-          <View className="gap-3">
-            <Text className="text-sm leading-6 text-muted">
-              이후 실제 로그인 API와 쿠키 기반 세션이 연결되면 이 화면은 인증 진입점으로 교체됩니다.
-            </Text>
-            <Button onPress={handleSignIn}>데모 로그인</Button>
+    <View className="flex-1 bg-background">
+      <StatusBar style="auto" />
+      <View
+        className="flex-1 justify-between px-6"
+        style={{
+          paddingTop: insets.top + 60,
+          paddingBottom: insets.bottom + 32,
+        }}
+      >
+        <View className="items-center gap-6">
+          <View className="h-20 w-20 items-center justify-center rounded-2xl bg-brand dark:bg-brand-dark">
+            <Text className="text-3xl font-bold text-white">M</Text>
           </View>
-        </SectionCard>
+          <View className="items-center gap-2">
+            <Text className="text-3xl font-bold tracking-tight text-foreground">
+              교움
+            </Text>
+            <Text className="text-center text-base leading-6 text-default-500">
+              교통약자의 안전한 지하철 이동을{'\n'}역과 연결해주는 지원 요청
+              서비스
+            </Text>
+          </View>
+        </View>
+
+        <View className="gap-5">
+          <Card className="rounded-2xl bg-default-50">
+            <Card.Body className="gap-3 p-4">
+              {FEATURES.map((f, i) => (
+                <View key={f.title}>
+                  {i > 0 ? <Separator /> : null}
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-tint dark:bg-brand-tint-dark">
+                      <Text className="text-base">{f.icon}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-foreground">
+                        {f.title}
+                      </Text>
+                      <Text className="text-xs text-default-400">
+                        {f.desc}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </Card.Body>
+          </Card>
+
+          <View className="gap-3">
+            <Button
+              size="lg"
+              className="rounded-xl bg-brand dark:bg-brand-dark"
+              onPress={handleSignIn}
+            >
+              시작하기
+            </Button>
+            <Text className="text-center text-xs text-default-300">
+              데모 모드 · 실제 인증은 추후 연동됩니다
+            </Text>
+          </View>
+        </View>
       </View>
-    </Screen>
+    </View>
   );
 }

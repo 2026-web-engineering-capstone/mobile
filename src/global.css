@@ -2,3 +2,17 @@
 @import 'uniwind';
 @import 'heroui-native/styles';
 @source '../node_modules/heroui-native/lib';
+
+@theme {
+  /* 브랜드 컬러 (라이트) */
+  --color-brand: #3681cb;
+  --color-brand-soft: #759cce;
+  --color-brand-surface: #f4f8fc;
+  --color-brand-tint: #e8f0fa;
+
+  /* 브랜드 컬러 (다크) */
+  --color-brand-dark: #6aafe0;
+  --color-brand-soft-dark: #8abde6;
+  --color-brand-surface-dark: #1a2332;
+  --color-brand-tint-dark: #1e2d3f;
+}
