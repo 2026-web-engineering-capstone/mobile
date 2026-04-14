@@ -1,5 +1,4 @@
-import { Text, View } from 'react-native';
-import { NativeNaverMap } from '@/features/home/components/native-naver-map';
+import { Platform, Text, View } from 'react-native';
 import {
   type Coordinate,
   useCurrentLocation,
@@ -33,7 +32,23 @@ function resolveNaverMapClientId() {
 
 const NAVER_MAP_CLIENT_ID = resolveNaverMapClientId();
 
-export function MapSection({ routePath, station }: MapSectionProps) {
+function WebMapFallback({ station }: { station: StationInfo }) {
+  return (
+    <View className="h-60 items-center justify-center rounded-2xl bg-default-100 px-6">
+      <Text className="text-center text-base font-semibold text-foreground">
+        {station.name} 주변 지도 미리보기
+      </Text>
+      <Text className="mt-2 text-center text-sm leading-6 text-default-500">
+        웹에서는 네이티브 네이버 지도를 사용할 수 없어 위치 카드로 대체합니다.
+      </Text>
+      <Text className="mt-3 text-center text-xs text-default-400">
+        위도 {station.latitude.toFixed(4)} · 경도 {station.longitude.toFixed(4)}
+      </Text>
+    </View>
+  );
+}
+
+function NativeMapSection({ routePath, station }: MapSectionProps) {
   const { currentLocation, errorMessage, isLoading } = useCurrentLocation();
 
   if (!NAVER_MAP_CLIENT_ID) {
@@ -48,6 +63,8 @@ export function MapSection({ routePath, station }: MapSectionProps) {
       </View>
     );
   }
+
+  const { NativeNaverMap } = require('@/features/home/components/native-naver-map') as typeof import('@/features/home/components/native-naver-map');
 
   return (
     <View className="h-60 overflow-hidden rounded-2xl bg-default-100">
@@ -68,4 +85,12 @@ export function MapSection({ routePath, station }: MapSectionProps) {
       ) : null}
     </View>
   );
+}
+
+export function MapSection({ routePath, station }: MapSectionProps) {
+  if (Platform.OS === 'web') {
+    return <WebMapFallback station={station} />;
+  }
+
+  return <NativeMapSection routePath={routePath} station={station} />;
 }

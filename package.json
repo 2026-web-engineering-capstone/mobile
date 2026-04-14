@@ -7,7 +7,7 @@
     "start": "EXPO_PACKAGER_PROXY_URL=http://localhost:8081 expo start --dev-client --localhost",
     "start:clear": "EXPO_PACKAGER_PROXY_URL=http://localhost:8081 expo start --dev-client --localhost --clear",
     "start:tunnel": "expo start --dev-client --tunnel",
-    "android": "expo run:android",
+    "android": "ANDROID_HOME=\"$HOME/Library/Android/sdk\" ANDROID_SDK_ROOT=\"$HOME/Library/Android/sdk\" PATH=\"$HOME/Library/Android/sdk/emulator:$HOME/Library/Android/sdk/platform-tools:$PATH\" expo run:android",
     "ios": "EXPO_PACKAGER_PROXY_URL=http://localhost:8081 expo run:ios --no-bundler",
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
