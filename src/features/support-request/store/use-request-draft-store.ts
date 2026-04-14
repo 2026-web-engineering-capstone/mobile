@@ -24,13 +24,13 @@ export const MEETING_POINT_LABELS: Record<MeetingPoint, string> = {
 };
 
 type RequestDraftState = {
-  originStation: string;
-  destinationStation: string;
+  originStationId: string;
+  destinationStationId: string;
   meetingPoint: MeetingPoint;
   notes: string;
   supportTypes: SupportType[];
-  setOriginStation: (value: string) => void;
-  setDestinationStation: (value: string) => void;
+  setOriginStationId: (value: string) => void;
+  setDestinationStationId: (value: string) => void;
   setMeetingPoint: (value: MeetingPoint) => void;
   setNotes: (value: string) => void;
   toggleSupportType: (value: SupportType) => void;
@@ -38,17 +38,17 @@ type RequestDraftState = {
 };
 
 const initialState = {
-  originStation: '인천대입구역',
-  destinationStation: '센트럴파크역',
+  originStationId: '',
+  destinationStationId: '',
   meetingPoint: 'elevator' as MeetingPoint,
   notes: '',
-  supportTypes: ['wheelchair'] as SupportType[],
+  supportTypes: [] as SupportType[],
 };
 
 export const useRequestDraftStore = create<RequestDraftState>((set) => ({
   ...initialState,
-  setOriginStation: (originStation) => set({ originStation }),
-  setDestinationStation: (destinationStation) => set({ destinationStation }),
+  setOriginStationId: (originStationId) => set({ originStationId }),
+  setDestinationStationId: (destinationStationId) => set({ destinationStationId }),
   setMeetingPoint: (meetingPoint) => set({ meetingPoint }),
   setNotes: (notes) => set({ notes }),
   toggleSupportType: (value) =>

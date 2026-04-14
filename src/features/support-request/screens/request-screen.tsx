@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
@@ -16,92 +15,86 @@ import type {
   MeetingPoint,
   SupportType,
 } from '@/features/support-request/store/use-request-draft-store';
+import {
+  useCreateSupportRequest,
+  useStations,
+} from '@/features/support-request/hooks/use-support-requests';
+import { useAuth } from '@/providers/auth-provider';
 
-const INCHEON_LINE_STATIONS = [
-  '계양역',
-  '귤현역',
-  '박촌역',
-  '임학역',
-  '작전역',
-  '갈산역',
-  '지식정보단지역',
-  '인천대입구역',
-  '센트럴파크역',
-  '국제업무지구역',
-  '송도달빛축제공원역',
-];
+function getErrorMessage() {
+  return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
+}
 
 export function RequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [submitted, setSubmitted] = useState(false);
-
+  const { role } = useAuth();
   const {
-    destinationStation,
+    data: stations = [],
+    error: stationsError,
+    isLoading: isStationsLoading,
+  } = useStations();
+  const createRequestMutation = useCreateSupportRequest();
+  const {
+    destinationStationId,
     meetingPoint,
     notes,
-    originStation,
+    originStationId,
     supportTypes,
-    setDestinationStation,
+    setDestinationStationId,
     setMeetingPoint,
     setNotes,
-    setOriginStation,
+    setOriginStationId,
     toggleSupportType,
     reset,
   } = useRequestDraftStore();
 
-  const handleSubmit = () => {
-    setSubmitted(true);
-  };
+  const hasStations = stations.length > 0;
+  const selectedOriginStation = stations.find((station) => station.id === originStationId);
+  const selectedDestinationStation = stations.find(
+    (station) => station.id === destinationStationId,
+  );
+  const originStation = selectedOriginStation?.name ?? '출발역 선택';
+  const destinationStation = selectedDestinationStation?.name ?? '도착역 선택';
+  const hasValidStationSelection = Boolean(
+    selectedOriginStation && selectedDestinationStation,
+  );
+  const isSubmitDisabled =
+    !hasStations ||
+    !hasValidStationSelection ||
+    originStationId === destinationStationId ||
+    supportTypes.length === 0 ||
+    createRequestMutation.isPending;
 
-  const handleNewRequest = () => {
-    reset();
-    setSubmitted(false);
-  };
-
-  if (submitted) {
-    return (
-      <View className="flex-1 bg-background">
-        <StatusBar style="auto" />
-        <View
-          className="flex-1 items-center justify-center gap-6 px-6"
-          style={{ paddingBottom: insets.bottom + 24 }}
-        >
-          <View className="h-20 w-20 items-center justify-center rounded-full bg-brand-tint dark:bg-brand-tint-dark">
-            <Text className="text-4xl">✓</Text>
-          </View>
-          <View className="items-center gap-2">
-            <Text className="text-2xl font-bold text-foreground">
-              지원 요청이 접수되었습니다
-            </Text>
-            <Text className="text-center text-sm leading-5 text-default-500">
-              {originStation} → {destinationStation}
-              {'\n'}역무원이 배정되면 알림으로 안내드릴게요
-            </Text>
-          </View>
-          <View className="w-full gap-3">
-            <Button
-              size="lg"
-              className="rounded-xl bg-brand dark:bg-brand-dark"
-              onPress={() =>
-                router.push('/(app)/support/status/REQ-2026-003')
-              }
-            >
-              요청 상태 확인
-            </Button>
-            <Button
-              size="lg"
-              variant="secondary"
-              className="rounded-xl"
-              onPress={handleNewRequest}
-            >
-              새 요청 작성
-            </Button>
-          </View>
-        </View>
-      </View>
-    );
+  if (role !== 'passenger') {
+    return <Redirect href="/(app)/(tabs)" />;
   }
+
+  const handleSubmit = () => {
+    if (!hasValidStationSelection || supportTypes.length === 0) {
+      return;
+    }
+
+    if (originStationId === destinationStationId) {
+      return;
+    }
+
+    createRequestMutation.mutate(
+      {
+        origin_station_id: originStationId,
+        destination_station_id: destinationStationId,
+        meeting_point: meetingPoint,
+        notes: notes.trim(),
+        support_types: supportTypes,
+      },
+      {
+        onSuccess: (created) => {
+          reset();
+          router.replace(`/(app)/support/status/${created.id}`);
+        },
+      },
+    );
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -123,7 +116,46 @@ export function RequestScreen() {
             </Text>
           </View>
 
-          {/* 출발역 / 도착역 */}
+          {isStationsLoading ? (
+            <Card className="rounded-2xl border border-default-200">
+              <Card.Body className="p-4">
+                <Text className="text-sm text-default-500">
+                  역 목록을 불러오는 중입니다.
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
+
+          {stationsError ? (
+            <Card className="rounded-2xl border border-warning/30">
+              <Card.Body className="p-4">
+                <Text className="text-sm text-warning">
+                  역 목록을 불러오지 못해 요청 제출이 잠시 비활성화되었습니다.
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
+
+          {!isStationsLoading && !stationsError && !hasStations ? (
+            <Card className="rounded-2xl border border-warning/30">
+              <Card.Body className="p-4">
+                <Text className="text-sm text-warning">
+                  현재 선택 가능한 역 정보가 없어 요청을 진행할 수 없습니다.
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
+
+          {createRequestMutation.error ? (
+            <Card className="rounded-2xl border border-danger/30">
+              <Card.Body className="p-4">
+                <Text className="text-sm text-danger">
+                  {getErrorMessage()}
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
+
           <Card className="rounded-2xl">
             <Card.Body className="gap-4 p-4">
               <Text className="text-xs font-semibold tracking-wider text-default-400">
@@ -140,20 +172,18 @@ export function RequestScreen() {
                     className="-mx-1"
                     contentContainerClassName="gap-2 px-1"
                   >
-                    {INCHEON_LINE_STATIONS.map((station) => (
+                    {stations.map((station) => (
                       <Chip
-                        key={station}
-                        variant={
-                          originStation === station ? 'primary' : 'soft'
-                        }
+                        key={`origin-${station.id}`}
+                        variant={originStationId === station.id ? 'primary' : 'soft'}
                         className={
-                          originStation === station
+                          originStationId === station.id
                             ? 'bg-brand dark:bg-brand-dark'
                             : ''
                         }
-                        onPress={() => setOriginStation(station)}
+                        onPress={() => setOriginStationId(station.id)}
                       >
-                        {station.replace('역', '')}
+                        {station.name.replace('역', '')}
                       </Chip>
                     ))}
                   </ScrollView>
@@ -169,20 +199,18 @@ export function RequestScreen() {
                     className="-mx-1"
                     contentContainerClassName="gap-2 px-1"
                   >
-                    {INCHEON_LINE_STATIONS.map((station) => (
+                    {stations.map((station) => (
                       <Chip
-                        key={station}
-                        variant={
-                          destinationStation === station ? 'primary' : 'soft'
-                        }
+                        key={`destination-${station.id}`}
+                        variant={destinationStationId === station.id ? 'primary' : 'soft'}
                         className={
-                          destinationStation === station
+                          destinationStationId === station.id
                             ? 'bg-brand dark:bg-brand-dark'
                             : ''
                         }
-                        onPress={() => setDestinationStation(station)}
+                        onPress={() => setDestinationStationId(station.id)}
                       >
-                        {station.replace('역', '')}
+                        {station.name.replace('역', '')}
                       </Chip>
                     ))}
                   </ScrollView>
@@ -191,7 +219,6 @@ export function RequestScreen() {
             </Card.Body>
           </Card>
 
-          {/* 지원 유형 */}
           <Card className="rounded-2xl">
             <Card.Body className="gap-4 p-4">
               <Text className="text-xs font-semibold tracking-wider text-default-400">
@@ -199,10 +226,7 @@ export function RequestScreen() {
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {(
-                  Object.entries(SUPPORT_TYPE_LABELS) as [
-                    SupportType,
-                    string,
-                  ][]
+                  Object.entries(SUPPORT_TYPE_LABELS) as [SupportType, string][]
                 ).map(([key, label]) => {
                   const selected = supportTypes.includes(key);
                   return (
@@ -220,7 +244,6 @@ export function RequestScreen() {
             </Card.Body>
           </Card>
 
-          {/* 만남 위치 */}
           <Card className="rounded-2xl">
             <Card.Body className="gap-4 p-4">
               <Text className="text-xs font-semibold tracking-wider text-default-400">
@@ -228,10 +251,7 @@ export function RequestScreen() {
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {(
-                  Object.entries(MEETING_POINT_LABELS) as [
-                    MeetingPoint,
-                    string,
-                  ][]
+                  Object.entries(MEETING_POINT_LABELS) as [MeetingPoint, string][]
                 ).map(([key, label]) => {
                   const selected = meetingPoint === key;
                   return (
@@ -252,7 +272,6 @@ export function RequestScreen() {
             </Card.Body>
           </Card>
 
-          {/* 메모 */}
           <Card className="rounded-2xl">
             <Card.Body className="gap-3 p-4">
               <Text className="text-xs font-semibold tracking-wider text-default-400">
@@ -261,16 +280,19 @@ export function RequestScreen() {
               <TextInput
                 className="min-h-[80px] rounded-xl bg-default-100 px-4 py-3 text-sm text-foreground"
                 multiline
+                maxLength={200}
                 placeholder="예: 전동휠체어 사용, 동행자 1명 있음"
                 placeholderTextColor={undefined}
                 textAlignVertical="top"
                 value={notes}
                 onChangeText={setNotes}
               />
+              <Text className="text-right text-xs text-default-300">
+                {notes.length}/200
+              </Text>
             </Card.Body>
           </Card>
 
-          {/* 요약 */}
           <Card className="rounded-2xl border-brand bg-brand-surface dark:border-brand-dark dark:bg-brand-surface-dark">
             <Card.Body className="gap-2 p-4">
               <Text className="text-xs font-semibold tracking-wider text-brand dark:text-brand-dark">
@@ -280,20 +302,17 @@ export function RequestScreen() {
                 {originStation} → {destinationStation}
               </Text>
               <Text className="text-sm text-default-600">
-                {supportTypes.map((t) => SUPPORT_TYPE_LABELS[t]).join(', ')} ·{' '}
+                {supportTypes.map((type) => SUPPORT_TYPE_LABELS[type]).join(', ')} ·{' '}
                 {MEETING_POINT_LABELS[meetingPoint]}
               </Text>
               {notes ? (
-                <Text className="text-xs text-default-400">
-                  메모: {notes}
-                </Text>
+                <Text className="text-xs text-default-400">메모: {notes}</Text>
               ) : null}
             </Card.Body>
           </Card>
         </View>
       </ScrollView>
 
-      {/* 하단 고정 버튼 */}
       <View
         className="border-t border-default-100 bg-background px-5 pt-3"
         style={{ paddingBottom: insets.bottom + 12 }}
@@ -301,7 +320,7 @@ export function RequestScreen() {
         <Button
           size="lg"
           className="rounded-xl bg-brand dark:bg-brand-dark"
-          isDisabled={!originStation || !destinationStation || supportTypes.length === 0}
+          isDisabled={isSubmitDisabled}
           onPress={handleSubmit}
         >
           지원 요청하기
