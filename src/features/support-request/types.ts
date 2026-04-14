@@ -14,6 +14,18 @@ export type SupportRequestStatus =
   | 'cancelled'
   | 'unavailable';
 
+export type SupportRequestChecklistItem = {
+  id: number;
+  code: string;
+  label: string;
+  checked: boolean;
+};
+
+export type SupportRequestChecklistDraftItem = Pick<
+  SupportRequestChecklistItem,
+  'code' | 'label' | 'checked'
+>;
+
 export type SupportRequestEvent = {
   id: number;
   type: string;
@@ -43,6 +55,7 @@ export type SupportRequest = {
   cancel_reason: string | null;
   unavailable_reason: string | null;
   completion_note: string | null;
+  checklist_items: SupportRequestChecklistItem[];
   events: SupportRequestEvent[];
 };
 

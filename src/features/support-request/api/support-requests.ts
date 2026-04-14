@@ -1,7 +1,11 @@
 import { apiFetch } from '@/lib/api/client';
 import type { Station } from '@/lib/api/types';
 import type { MeetingPoint, SupportType } from '@/features/support-request/store/use-request-draft-store';
-import type { SupportRequest, SupportRequestStatus } from '@/features/support-request/types';
+import type {
+  SupportRequest,
+  SupportRequestChecklistItem,
+  SupportRequestStatus,
+} from '@/features/support-request/types';
 
 export type CreateSupportRequestPayload = {
   origin_station_id: string;
@@ -41,6 +45,16 @@ export function cancelSupportRequest(requestId: string, reason: string) {
 export function assignSupportRequest(requestId: string) {
   return apiFetch<SupportRequest>(`/support-requests/${requestId}/assign`, {
     method: 'POST',
+  });
+}
+
+export function updateSupportRequestChecklist(
+  requestId: string,
+  items: Array<Pick<SupportRequestChecklistItem, 'code' | 'label' | 'checked'>>,
+) {
+  return apiFetch<SupportRequest>(`/support-requests/${requestId}/checklist`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
   });
 }
 

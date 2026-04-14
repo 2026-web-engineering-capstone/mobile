@@ -12,6 +12,7 @@ import {
   listStations,
   listSupportRequests,
   markSupportRequestUnavailable,
+  updateSupportRequestChecklist,
   updateSupportRequestStatus,
   type CreateSupportRequestPayload,
 } from '@/features/support-request/api/support-requests';
@@ -89,6 +90,20 @@ export function useAssignSupportRequest() {
     mutationFn: (requestId: string) => assignSupportRequest(requestId),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(updated.id), updated);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
+    },
+  });
+}
+
+export function useUpdateSupportRequestChecklist(requestId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (
+      items: Array<{ code: string; label: string; checked: boolean }>,
+    ) => updateSupportRequestChecklist(requestId, items),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
