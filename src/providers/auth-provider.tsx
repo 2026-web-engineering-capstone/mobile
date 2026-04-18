@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchSession, signIn as signInApi, signOut as signOutApi } from '@/features/auth/api/auth';
+import { connectSupportRequestsWebSocket } from '@/features/support-request/realtime';
 import { ApiError } from '@/lib/api/client';
 import type { Role, SessionUser } from '@/lib/api/types';
 import { queryKeys } from '@/lib/query/query-keys';
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const refreshSessionRequestIdRef = useRef(0);
+  const supportRequestsConnectionRef = useRef<{ close: () => void } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
 
@@ -36,6 +38,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await queryClient.cancelQueries();
     queryClient.clear();
   }, [queryClient]);
+
+  const closeRealtimeConnection = useCallback(() => {
+    supportRequestsConnectionRef.current?.close();
+    supportRequestsConnectionRef.current = null;
+  }, []);
 
   const refreshSession = useCallback(async () => {
     const requestId = refreshSessionRequestIdRef.current + 1;
@@ -68,6 +75,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void refreshSession();
   }, [refreshSession]);
 
+  useEffect(() => {
+    if (!user?.id) {
+      closeRealtimeConnection();
+      return;
+    }
+
+    const connection = connectSupportRequestsWebSocket(queryClient);
+    supportRequestsConnectionRef.current = connection;
+
+    return () => {
+      if (supportRequestsConnectionRef.current === connection) {
+        closeRealtimeConnection();
+      }
+    };
+  }, [closeRealtimeConnection, queryClient, user?.id]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       isAuthenticated: Boolean(user),
@@ -76,6 +99,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       user,
       signIn: async (role) => {
         refreshSessionRequestIdRef.current += 1;
+        closeRealtimeConnection();
         await clearSessionQueries();
         const session = await signInApi(role);
         setUser(session.user);
@@ -83,6 +107,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       signOut: async () => {
         refreshSessionRequestIdRef.current += 1;
+        closeRealtimeConnection();
         try {
           await signOutApi();
         } finally {
@@ -92,7 +117,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       refreshSession,
     }),
-    [clearSessionQueries, isLoading, queryClient, refreshSession, user],
+    [
+      clearSessionQueries,
+      closeRealtimeConnection,
+      isLoading,
+      queryClient,
+      refreshSession,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
