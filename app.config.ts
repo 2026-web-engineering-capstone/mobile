@@ -70,6 +70,12 @@ const config: ExpoConfig = {
         },
       },
     ],
+    [
+      'expo-notifications',
+      {
+        defaultChannel: 'support-request-updates',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import {
   createContext,
   PropsWithChildren,
@@ -10,6 +11,13 @@ import {
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchSession, signIn as signInApi, signOut as signOutApi } from '@/features/auth/api/auth';
+import {
+  clearCurrentPushToken,
+  getCurrentPushToken,
+  getPushInstallationId,
+} from '@/features/auth/push-token-session';
+import { clearStationPreferencesStorage } from '@/features/stations/store/use-station-preferences-store';
+import { clearRequestDraftStorage } from '@/features/support-request/store/use-request-draft-store';
 import { connectSupportRequestsWebSocket } from '@/features/support-request/realtime';
 import { ApiError } from '@/lib/api/client';
 import type { Role, SessionUser } from '@/lib/api/types';
@@ -34,6 +42,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<SessionUser | null>(null);
 
+  const clearLocalSessionState = useCallback(async () => {
+    await Promise.all([
+      clearRequestDraftStorage(),
+      clearStationPreferencesStorage(),
+    ]);
+  }, []);
+
   const clearSessionQueries = useCallback(async () => {
     await queryClient.cancelQueries();
     queryClient.clear();
@@ -57,19 +72,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       setUser(session.user);
       queryClient.setQueryData(queryKeys.auth.session, session);
-    } catch {
+    } catch (error) {
       if (refreshSessionRequestIdRef.current !== requestId) {
         return;
       }
 
-      await clearSessionQueries();
-      setUser(null);
+      if (error instanceof ApiError && error.status === 401) {
+        await clearSessionQueries();
+        await clearLocalSessionState();
+        setUser(null);
+      }
     } finally {
       if (refreshSessionRequestIdRef.current === requestId) {
         setIsLoading(false);
       }
     }
-  }, [clearSessionQueries, queryClient]);
+  }, [clearLocalSessionState, clearSessionQueries, queryClient]);
 
   useEffect(() => {
     void refreshSession();
@@ -100,24 +118,37 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signIn: async (role) => {
         refreshSessionRequestIdRef.current += 1;
         closeRealtimeConnection();
+        const installationId = await getPushInstallationId();
+        const pushToken = await getCurrentPushToken();
+        const pushPlatform =
+          pushToken && (Platform.OS === 'ios' || Platform.OS === 'android')
+            ? Platform.OS
+            : undefined;
+        const session = await signInApi(role, {
+          installationId,
+          pushToken: pushToken ?? undefined,
+          pushPlatform,
+        });
         await clearSessionQueries();
-        const session = await signInApi(role);
+        await clearLocalSessionState();
         setUser(session.user);
         queryClient.setQueryData(queryKeys.auth.session, session);
       },
       signOut: async () => {
         refreshSessionRequestIdRef.current += 1;
         closeRealtimeConnection();
-        try {
-          await signOutApi();
-        } finally {
-          await clearSessionQueries();
-          setUser(null);
-        }
+        const installationId = await getPushInstallationId();
+        const pushToken = await getCurrentPushToken();
+        await signOutApi(installationId, pushToken ?? undefined);
+        await clearCurrentPushToken();
+        await clearSessionQueries();
+        await clearLocalSessionState();
+        setUser(null);
       },
       refreshSession,
     }),
     [
+      clearLocalSessionState,
       clearSessionQueries,
       closeRealtimeConnection,
       isLoading,

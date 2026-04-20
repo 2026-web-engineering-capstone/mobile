@@ -6,37 +6,42 @@ import { Card } from 'heroui-native/card';
 import { Chip } from 'heroui-native/chip';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-type Station = {
-  name: string;
-  line: string;
-  lineColor: string;
-};
-
-const ALL_STATIONS: Station[] = [
-  { name: '계양역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '귤현역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '박촌역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '임학역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '작전역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '갈산역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '지식정보단지역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '인천대입구역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '센트럴파크역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '국제업무지구역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '송도달빛축제공원역', line: '인천1호선', lineColor: '#3681cb' },
-];
-
-const RECENT_STATIONS = ['인천대입구역', '센트럴파크역', '계양역'];
+import { useStations } from '@/features/support-request/hooks/use-support-requests';
+import { useRequestDraftStore } from '@/features/support-request/store/use-request-draft-store';
+import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
+import type { Station } from '@/lib/api/types';
 
 export function StationSearchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const { data: stations = [] } = useStations(query || undefined);
+  const recentStations = useStationPreferencesStore((state) => state.recentStations);
+  const recordRecentStation = useStationPreferencesStore((state) => state.recordRecentStation);
+  const toggleFavoriteStation = useStationPreferencesStore((state) => state.toggleFavoriteStation);
+  const isFavoriteStation = useStationPreferencesStore((state) => state.isFavoriteStation);
+  const originStationId = useRequestDraftStore((state) => state.originStationId);
+  const destinationStationId = useRequestDraftStore((state) => state.destinationStationId);
+  const setOriginStationId = useRequestDraftStore((state) => state.setOriginStationId);
+  const setDestinationStationId = useRequestDraftStore((state) => state.setDestinationStationId);
 
-  const filtered = query
-    ? ALL_STATIONS.filter((s) => s.name.includes(query))
-    : ALL_STATIONS;
+  const filtered = query ? stations.filter((station) => station.name.includes(query)) : stations;
+
+  const selectStation = (station: Station) => {
+    const shouldFillOrigin = !originStationId || Boolean(destinationStationId);
+
+    if (shouldFillOrigin) {
+      setOriginStationId(station.id);
+      if (destinationStationId === station.id) {
+        setDestinationStationId('');
+      }
+    } else {
+      setDestinationStationId(station.id);
+    }
+
+    recordRecentStation(station);
+    router.back();
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -78,19 +83,19 @@ export function StationSearchScreen() {
           </View>
 
           {/* 최근 이용 */}
-          {!query ? (
+          {!query && recentStations.length > 0 ? (
             <View className="gap-3">
               <Text className="text-xs font-semibold tracking-wider text-default-400">
                 최근 이용
               </Text>
               <View className="flex-row flex-wrap gap-2">
-                {RECENT_STATIONS.map((name) => (
+                {recentStations.map((station) => (
                   <Chip
-                    key={name}
+                    key={station.id}
                     variant="soft"
-                    onPress={() => router.back()}
+                    onPress={() => selectStation(station)}
                   >
-                    {name.replace('역', '')}
+                    {station.name.replace('역', '')}
                   </Chip>
                 ))}
               </View>
@@ -104,28 +109,46 @@ export function StationSearchScreen() {
             <Text className="mb-2 text-xs font-semibold tracking-wider text-default-400">
               {query ? `검색 결과 (${filtered.length})` : '전체 역'}
             </Text>
-            {filtered.map((station) => (
-              <Pressable
-                key={station.name}
-                className="flex-row items-center gap-3 rounded-xl px-2 py-3"
-                onPress={() => router.back()}
-              >
+            {filtered.map((station) => {
+              const favorite = isFavoriteStation(station.id);
+
+              return (
                 <View
-                  className="h-7 w-7 items-center justify-center rounded-full"
-                  style={{ backgroundColor: station.lineColor }}
+                  key={station.id}
+                  className="flex-row items-center gap-3 rounded-xl px-2 py-3"
                 >
-                  <Text className="text-[10px] font-bold text-white">인</Text>
+                  <Pressable
+                    className="flex-1 flex-row items-center gap-3"
+                    onPress={() => selectStation(station)}
+                  >
+                    <View
+                      className="h-7 w-7 items-center justify-center rounded-full"
+                      style={{ backgroundColor: station.line_color }}
+                    >
+                      <Text className="text-[10px] font-bold text-white">인</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-medium text-foreground">
+                        {station.name}
+                      </Text>
+                      <Text className="text-xs text-default-400">
+                        {station.line}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    className={`rounded-lg px-3 py-1.5 ${favorite ? 'bg-warning/15' : 'bg-default-100'}`}
+                    onPress={() => toggleFavoriteStation(station)}
+                  >
+                    <Text
+                      className={`text-xs font-medium ${favorite ? 'text-warning' : 'text-default-500'}`}
+                    >
+                      {favorite ? '저장됨' : '즐겨찾기'}
+                    </Text>
+                  </Pressable>
                 </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-medium text-foreground">
-                    {station.name}
-                  </Text>
-                  <Text className="text-xs text-default-400">
-                    {station.line}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
+              );
+            })}
             {filtered.length === 0 ? (
               <Card className="rounded-2xl">
                 <Card.Body className="items-center p-6">

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { asyncJsonStorage } from '@/lib/storage/async-storage';
 
 export type SupportType = 'wheelchair' | 'visual-guide' | 'boarding-ramp';
 
@@ -45,17 +47,37 @@ const initialState = {
   supportTypes: [] as SupportType[],
 };
 
-export const useRequestDraftStore = create<RequestDraftState>((set) => ({
-  ...initialState,
-  setOriginStationId: (originStationId) => set({ originStationId }),
-  setDestinationStationId: (destinationStationId) => set({ destinationStationId }),
-  setMeetingPoint: (meetingPoint) => set({ meetingPoint }),
-  setNotes: (notes) => set({ notes }),
-  toggleSupportType: (value) =>
-    set((state) => ({
-      supportTypes: state.supportTypes.includes(value)
-        ? state.supportTypes.filter((item) => item !== value)
-        : [...state.supportTypes, value],
-    })),
-  reset: () => set(initialState),
-}));
+export const useRequestDraftStore = create<RequestDraftState>()(
+  persist(
+    (set) => ({
+      ...initialState,
+      setOriginStationId: (originStationId) => set({ originStationId }),
+      setDestinationStationId: (destinationStationId) => set({ destinationStationId }),
+      setMeetingPoint: (meetingPoint) => set({ meetingPoint }),
+      setNotes: (notes) => set({ notes }),
+      toggleSupportType: (value) =>
+        set((state) => ({
+          supportTypes: state.supportTypes.includes(value)
+            ? state.supportTypes.filter((item) => item !== value)
+            : [...state.supportTypes, value],
+        })),
+      reset: () => set(initialState),
+    }),
+    {
+      name: 'support-request-draft',
+      storage: asyncJsonStorage,
+      partialize: (state) => ({
+        originStationId: state.originStationId,
+        destinationStationId: state.destinationStationId,
+        meetingPoint: state.meetingPoint,
+        notes: state.notes,
+        supportTypes: state.supportTypes,
+      }),
+    },
+  ),
+);
+
+export async function clearRequestDraftStorage() {
+  useRequestDraftStore.getState().reset();
+  await useRequestDraftStore.persist.clearStorage();
+}

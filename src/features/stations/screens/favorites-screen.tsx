@@ -1,30 +1,19 @@
-import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-type FavoriteStation = {
-  name: string;
-  line: string;
-  lineColor: string;
-};
-
-const INITIAL_FAVORITES: FavoriteStation[] = [
-  { name: '인천대입구역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '센트럴파크역', line: '인천1호선', lineColor: '#3681cb' },
-  { name: '계양역', line: '인천1호선', lineColor: '#3681cb' },
-];
+import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
 
 export function FavoritesScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [favorites, setFavorites] = useState(INITIAL_FAVORITES);
-
-  const removeFavorite = (name: string) => {
-    setFavorites((prev) => prev.filter((f) => f.name !== name));
-  };
+  const favoriteStations = useStationPreferencesStore((state) => state.favoriteStations);
+  const removeFavoriteStation = useStationPreferencesStore(
+    (state) => state.removeFavoriteStation,
+  );
 
   return (
     <View className="flex-1 bg-background">
@@ -46,16 +35,16 @@ export function FavoritesScreen() {
             </Text>
           </View>
 
-          {favorites.length > 0 ? (
+          {favoriteStations.length > 0 ? (
             <Card className="rounded-2xl">
               <Card.Body className="p-0">
-                {favorites.map((station, index) => (
+                {favoriteStations.map((station, index) => (
                   <View key={station.name}>
                     {index > 0 ? <Separator /> : null}
                     <View className="flex-row items-center gap-4 px-5 py-4">
                       <View
                         className="h-8 w-8 items-center justify-center rounded-full"
-                        style={{ backgroundColor: station.lineColor }}
+                        style={{ backgroundColor: station.line_color }}
                       >
                         <Text className="text-xs font-bold text-white">인</Text>
                       </View>
@@ -69,7 +58,7 @@ export function FavoritesScreen() {
                       </View>
                       <Pressable
                         className="rounded-lg bg-danger-50 px-3 py-1.5"
-                        onPress={() => removeFavorite(station.name)}
+                        onPress={() => removeFavoriteStation(station.id)}
                       >
                         <Text className="text-xs font-medium text-danger">
                           삭제
@@ -94,7 +83,11 @@ export function FavoritesScreen() {
             </Card>
           )}
 
-          <Button variant="secondary" className="rounded-xl" onPress={() => {}}>
+          <Button
+            variant="secondary"
+            className="rounded-xl"
+            onPress={() => router.push('/(app)/stations/search')}
+          >
             역 추가하기
           </Button>
         </View>
