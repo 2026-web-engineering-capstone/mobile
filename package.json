@@ -49,6 +49,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.0",
+    "@types/react-test-renderer": "^19",
+    "react-test-renderer": "19.2.0",
     "typescript": "~5.9.3"
   },
   "packageManager": "yarn@4.13.0"
