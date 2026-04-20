@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Card } from 'heroui-native/card';
 import { Chip } from 'heroui-native/chip';
@@ -11,10 +11,22 @@ import { useRequestDraftStore } from '@/features/support-request/store/use-reque
 import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
 import type { Station } from '@/lib/api/types';
 
+type StationSearchContext = 'origin' | 'destination';
+
+function getSelectionContext(context?: string): StationSearchContext | null {
+  if (context === 'origin' || context === 'destination') {
+    return context;
+  }
+
+  return null;
+}
+
 export function StationSearchScreen() {
   const router = useRouter();
+  const { context } = useLocalSearchParams<{ context?: string }>();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const selectionContext = getSelectionContext(context);
   const { data: stations = [] } = useStations(query || undefined);
   const recentStations = useStationPreferencesStore((state) => state.recentStations);
   const recordRecentStation = useStationPreferencesStore((state) => state.recordRecentStation);
@@ -26,17 +38,23 @@ export function StationSearchScreen() {
   const setDestinationStationId = useRequestDraftStore((state) => state.setDestinationStationId);
 
   const filtered = query ? stations.filter((station) => station.name.includes(query)) : stations;
+  const canSelectStation = selectionContext !== null;
 
   const selectStation = (station: Station) => {
-    const shouldFillOrigin = !originStationId || Boolean(destinationStationId);
+    if (!selectionContext) {
+      return;
+    }
 
-    if (shouldFillOrigin) {
+    if (selectionContext === 'origin') {
       setOriginStationId(station.id);
       if (destinationStationId === station.id) {
         setDestinationStationId('');
       }
     } else {
       setDestinationStationId(station.id);
+      if (originStationId === station.id) {
+        setOriginStationId('');
+      }
     }
 
     recordRecentStation(station);
@@ -82,6 +100,16 @@ export function StationSearchScreen() {
             ) : null}
           </View>
 
+          {!canSelectStation ? (
+            <Card className="rounded-2xl border border-warning/30">
+              <Card.Body className="p-4">
+                <Text className="text-sm text-warning">
+                  역 선택 맥락이 없어 요청 화면에서 다시 진입해주세요.
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
+
           {/* 최근 이용 */}
           {!query && recentStations.length > 0 ? (
             <View className="gap-3">
@@ -93,6 +121,7 @@ export function StationSearchScreen() {
                   <Chip
                     key={station.id}
                     variant="soft"
+                    disabled={!canSelectStation}
                     onPress={() => selectStation(station)}
                   >
                     {station.name.replace('역', '')}
@@ -119,6 +148,7 @@ export function StationSearchScreen() {
                 >
                   <Pressable
                     className="flex-1 flex-row items-center gap-3"
+                    disabled={!canSelectStation}
                     onPress={() => selectStation(station)}
                   >
                     <View

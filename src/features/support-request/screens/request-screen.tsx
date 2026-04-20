@@ -25,6 +25,30 @@ function getErrorMessage() {
   return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
 }
 
+function selectOriginStation(
+  stationId: string,
+  destinationStationId: string,
+  setOriginStationId: (value: string) => void,
+  setDestinationStationId: (value: string) => void,
+) {
+  setOriginStationId(stationId);
+  if (destinationStationId === stationId) {
+    setDestinationStationId('');
+  }
+}
+
+function selectDestinationStation(
+  stationId: string,
+  originStationId: string,
+  setOriginStationId: (value: string) => void,
+  setDestinationStationId: (value: string) => void,
+) {
+  setDestinationStationId(stationId);
+  if (originStationId === stationId) {
+    setOriginStationId('');
+  }
+}
+
 export function RequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -166,6 +190,21 @@ export function RequestScreen() {
                   <Text className="text-xs font-medium text-default-500">
                     출발역
                   </Text>
+                  <Pressable
+                    className="rounded-xl border border-default-200 bg-background px-4 py-3"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(app)/stations/search',
+                        params: { context: 'origin' },
+                      })
+                    }
+                  >
+                    <Text
+                      className={`text-sm ${selectedOriginStation ? 'font-medium text-foreground' : 'text-default-400'}`}
+                    >
+                      {originStation}
+                    </Text>
+                  </Pressable>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -181,7 +220,14 @@ export function RequestScreen() {
                             ? 'bg-brand dark:bg-brand-dark'
                             : ''
                         }
-                        onPress={() => setOriginStationId(station.id)}
+                        onPress={() =>
+                          selectOriginStation(
+                            station.id,
+                            destinationStationId,
+                            setOriginStationId,
+                            setDestinationStationId,
+                          )
+                        }
                       >
                         {station.name.replace('역', '')}
                       </Chip>
@@ -193,6 +239,21 @@ export function RequestScreen() {
                   <Text className="text-xs font-medium text-default-500">
                     도착역
                   </Text>
+                  <Pressable
+                    className="rounded-xl border border-default-200 bg-background px-4 py-3"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(app)/stations/search',
+                        params: { context: 'destination' },
+                      })
+                    }
+                  >
+                    <Text
+                      className={`text-sm ${selectedDestinationStation ? 'font-medium text-foreground' : 'text-default-400'}`}
+                    >
+                      {destinationStation}
+                    </Text>
+                  </Pressable>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -208,7 +269,14 @@ export function RequestScreen() {
                             ? 'bg-brand dark:bg-brand-dark'
                             : ''
                         }
-                        onPress={() => setDestinationStationId(station.id)}
+                        onPress={() =>
+                          selectDestinationStation(
+                            station.id,
+                            originStationId,
+                            setOriginStationId,
+                            setDestinationStationId,
+                          )
+                        }
                       >
                         {station.name.replace('역', '')}
                       </Chip>
