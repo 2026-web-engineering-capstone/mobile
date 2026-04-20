@@ -14,6 +14,8 @@ import { useSupportRequest } from '@/features/support-request/hooks/use-support-
 import {
   canStaffManageSupportRequest,
   canStaffViewSupportRequest,
+  getCancelReasonLabel,
+  getUnavailableReasonLabel,
   STATUS_CHIP_COLORS,
   SUPPORT_REQUEST_STATUS_GUIDES,
   SUPPORT_REQUEST_STATUS_LABELS,
@@ -79,10 +81,12 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
   const canViewRequest =
     (role === 'passenger' && request.passenger_id === user?.id) ||
     canStaffViewSupportRequest(request, user);
-  const currentGuide = request.cancel_reason
-    ? `취소 사유: ${request.cancel_reason}`
-    : request.unavailable_reason
-      ? `지원 불가 사유: ${request.unavailable_reason}`
+  const cancelReasonLabel = getCancelReasonLabel(request.cancel_reason);
+  const unavailableReasonLabel = getUnavailableReasonLabel(request.unavailable_reason);
+  const currentGuide = cancelReasonLabel
+    ? `취소 사유: ${cancelReasonLabel}`
+    : unavailableReasonLabel
+      ? `지원 불가 사유: ${unavailableReasonLabel}`
       : request.completion_note
         ? `완료 메모: ${request.completion_note}`
         : SUPPORT_REQUEST_STATUS_GUIDES[request.status];

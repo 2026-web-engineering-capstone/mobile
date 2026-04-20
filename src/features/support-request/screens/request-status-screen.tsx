@@ -25,14 +25,20 @@ import {
   canStaffManageSupportRequest,
   canStaffViewSupportRequest,
   CANCELLABLE_REQUEST_STATUSES,
+  CANCEL_REASON_LABELS,
+  getCancelReasonLabel,
+  getUnavailableReasonLabel,
   STATUS_CHIP_COLORS,
   SUPPORT_REQUEST_FLOW,
   SUPPORT_REQUEST_STATUS_GUIDES,
   SUPPORT_REQUEST_STATUS_LABELS,
   TERMINAL_REQUEST_STATUSES,
+  UNAVAILABLE_REASON_LABELS,
+  type CancelReasonCode,
   type SupportRequestStatus,
   type SupportRequestChecklistDraftItem,
   type SupportRequestChecklistItem,
+  type UnavailableReasonCode,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -80,13 +86,22 @@ function toggleChecklistItem(
   );
 }
 
+const CANCEL_REASON_OPTIONS = Object.entries(CANCEL_REASON_LABELS) as Array<[
+  CancelReasonCode,
+  string,
+]>;
+const UNAVAILABLE_REASON_OPTIONS = Object.entries(
+  UNAVAILABLE_REASON_LABELS,
+) as Array<[UnavailableReasonCode, string]>;
+
 export function RequestStatusScreen({ requestId }: { requestId: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { role, user } = useAuth();
   const [trainCarNumberInput, setTrainCarNumberInput] = useState('');
-  const [cancelReasonInput, setCancelReasonInput] = useState('');
-  const [unavailableReasonInput, setUnavailableReasonInput] = useState('');
+  const [cancelReasonInput, setCancelReasonInput] = useState<CancelReasonCode | null>(null);
+  const [unavailableReasonInput, setUnavailableReasonInput] =
+    useState<UnavailableReasonCode | null>(null);
   const [completionNoteInput, setCompletionNoteInput] = useState('');
   const [checklistItems, setChecklistItems] = useState<
     SupportRequestChecklistDraftItem[] | null
@@ -161,8 +176,8 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
     nextStatus === 'boarded' && !request.train_car_number;
   const requiresCompletionNote = nextStatus === 'completed';
   const hasValidTrainCarInput = /^\d{1,2}$/.test(trainCarNumberInput.trim());
-  const hasValidCancelReason = cancelReasonInput.trim().length > 0;
-  const hasValidUnavailableReason = unavailableReasonInput.trim().length > 0;
+  const hasValidCancelReason = cancelReasonInput !== null;
+  const hasValidUnavailableReason = unavailableReasonInput !== null;
   const hasValidCompletionNote = completionNoteInput.trim().length > 0;
   const canAdvance =
     canManageRequest &&
@@ -184,10 +199,12 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
     updateStatusMutation.isPending ||
     unavailableMutation.isPending;
 
-  const currentGuide = request.cancel_reason
-    ? `취소 사유: ${request.cancel_reason}`
-    : request.unavailable_reason
-      ? `지원 불가 사유: ${request.unavailable_reason}`
+  const cancelReasonLabel = getCancelReasonLabel(request.cancel_reason);
+  const unavailableReasonLabel = getUnavailableReasonLabel(request.unavailable_reason);
+  const currentGuide = cancelReasonLabel
+    ? `취소 사유: ${cancelReasonLabel}`
+    : unavailableReasonLabel
+      ? `지원 불가 사유: ${unavailableReasonLabel}`
       : request.completion_note
         ? `완료 메모: ${request.completion_note}`
         : SUPPORT_REQUEST_STATUS_GUIDES[request.status];
@@ -500,15 +517,34 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
                 <Text className="text-sm font-semibold text-foreground">
                   지원 불가 사유
                 </Text>
-                <TextInput
-                  className="min-h-[88px] rounded-xl bg-default-100 px-4 py-3 text-sm text-foreground"
-                  multiline
-                  placeholder="지원이 어려운 사유를 입력해주세요"
-                  placeholderTextColor={undefined}
-                  textAlignVertical="top"
-                  value={unavailableReasonInput}
-                  onChangeText={setUnavailableReasonInput}
-                />
+                <View className="gap-2">
+                  {UNAVAILABLE_REASON_OPTIONS.map(([reasonCode, label]) => {
+                    const isSelected = unavailableReasonInput === reasonCode;
+
+                    return (
+                      <Pressable
+                        key={reasonCode}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: isSelected }}
+                        className={`rounded-xl border px-4 py-3 ${
+                          isSelected
+                            ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark'
+                            : 'border-default-200 bg-default-50'
+                        }`}
+                        disabled={isMutating}
+                        onPress={() => setUnavailableReasonInput(reasonCode)}
+                      >
+                        <Text
+                          className={`text-sm ${
+                            isSelected ? 'font-semibold text-foreground' : 'text-default-600'
+                          }`}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </Card.Body>
             </Card>
           ) : null}
@@ -519,15 +555,34 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
                 <Text className="text-sm font-semibold text-foreground">
                   취소 사유
                 </Text>
-                <TextInput
-                  className="min-h-[88px] rounded-xl bg-default-100 px-4 py-3 text-sm text-foreground"
-                  multiline
-                  placeholder="취소 사유를 입력해주세요"
-                  placeholderTextColor={undefined}
-                  textAlignVertical="top"
-                  value={cancelReasonInput}
-                  onChangeText={setCancelReasonInput}
-                />
+                <View className="gap-2">
+                  {CANCEL_REASON_OPTIONS.map(([reasonCode, label]) => {
+                    const isSelected = cancelReasonInput === reasonCode;
+
+                    return (
+                      <Pressable
+                        key={reasonCode}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: isSelected }}
+                        className={`rounded-xl border px-4 py-3 ${
+                          isSelected
+                            ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark'
+                            : 'border-default-200 bg-default-50'
+                        }`}
+                        disabled={isMutating}
+                        onPress={() => setCancelReasonInput(reasonCode)}
+                      >
+                        <Text
+                          className={`text-sm ${
+                            isSelected ? 'font-semibold text-foreground' : 'text-default-600'
+                          }`}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </Card.Body>
             </Card>
           ) : null}
@@ -570,7 +625,12 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
             variant="secondary"
             className="rounded-xl"
             isDisabled={isMutating || !hasValidUnavailableReason}
-            onPress={() => unavailableMutation.mutate(unavailableReasonInput.trim())}
+            onPress={() => {
+              if (!unavailableReasonInput) {
+                return;
+              }
+              unavailableMutation.mutate(unavailableReasonInput);
+            }}
           >
             지원 불가 처리
           </Button>
@@ -583,7 +643,12 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
               variant="danger-soft"
               className="flex-1 rounded-xl"
               isDisabled={isMutating || !hasValidCancelReason}
-              onPress={() => cancelMutation.mutate(cancelReasonInput.trim())}
+              onPress={() => {
+                if (!cancelReasonInput) {
+                  return;
+                }
+                cancelMutation.mutate(cancelReasonInput);
+              }}
             >
               요청 취소
             </Button>

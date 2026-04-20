@@ -36,6 +36,16 @@ export type SupportRequestEvent = {
   created_at: string;
 };
 
+export type CancelReasonCode =
+  | 'change_of_plans'
+  | 'duplicate_request'
+  | 'no_longer_needed';
+
+export type UnavailableReasonCode =
+  | 'no_show'
+  | 'urgent_duty'
+  | 'support_unavailable';
+
 export type SupportRequest = {
   id: string;
   status: SupportRequestStatus;
@@ -52,8 +62,8 @@ export type SupportRequest = {
   created_at: string;
   passenger_id: string;
   assigned_staff_id: string | null;
-  cancel_reason: string | null;
-  unavailable_reason: string | null;
+  cancel_reason: CancelReasonCode | null;
+  unavailable_reason: UnavailableReasonCode | null;
   completion_note: string | null;
   checklist_items: SupportRequestChecklistItem[];
   events: SupportRequestEvent[];
@@ -89,6 +99,42 @@ export const CANCELLABLE_REQUEST_STATUSES: SupportRequestStatus[] = [
   'submitted',
   'assigned',
 ];
+
+export const CANCEL_REASON_LABELS: Record<CancelReasonCode, string> = {
+  change_of_plans: '일정이 변경되었어요.',
+  duplicate_request: '중복으로 요청했어요.',
+  no_longer_needed: '도움이 더 이상 필요하지 않아요.',
+};
+
+export const UNAVAILABLE_REASON_LABELS: Record<UnavailableReasonCode, string> = {
+  no_show: '승객을 만나지 못했어요.',
+  urgent_duty: '긴급 업무 대응이 필요해졌어요.',
+  support_unavailable: '현재 현장 지원이 어려워요.',
+};
+
+function getReasonLabel<T extends string>(
+  labels: Record<T, string>,
+  reason: string | null | undefined,
+  fallbackPrefix: string,
+) {
+  if (!reason) {
+    return null;
+  }
+
+  if (reason in labels) {
+    return labels[reason as T];
+  }
+
+  return `${fallbackPrefix} (${reason})`;
+}
+
+export function getCancelReasonLabel(reason: string | null | undefined) {
+  return getReasonLabel(CANCEL_REASON_LABELS, reason, '알 수 없는 취소 사유');
+}
+
+export function getUnavailableReasonLabel(reason: string | null | undefined) {
+  return getReasonLabel(UNAVAILABLE_REASON_LABELS, reason, '알 수 없는 지원 불가 사유');
+}
 
 export const SUPPORT_REQUEST_STATUS_GUIDES: Record<SupportRequestStatus, string> = {
   submitted: '요청이 정상적으로 접수되었습니다.',

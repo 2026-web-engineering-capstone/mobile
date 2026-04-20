@@ -2,9 +2,11 @@ import { apiFetch } from '@/lib/api/client';
 import type { Station } from '@/lib/api/types';
 import type { MeetingPoint, SupportType } from '@/features/support-request/store/use-request-draft-store';
 import type {
+  CancelReasonCode,
   SupportRequest,
   SupportRequestChecklistItem,
   SupportRequestStatus,
+  UnavailableReasonCode,
 } from '@/features/support-request/types';
 
 export type CreateSupportRequestPayload = {
@@ -35,7 +37,7 @@ export function createSupportRequest(payload: CreateSupportRequestPayload) {
   });
 }
 
-export function cancelSupportRequest(requestId: string, reason: string) {
+export function cancelSupportRequest(requestId: string, reason: CancelReasonCode) {
   return apiFetch<SupportRequest>(`/support-requests/${requestId}/cancel`, {
     method: 'POST',
     body: JSON.stringify({ reason }),
@@ -82,7 +84,10 @@ export function updateSupportRequestStatus(
   });
 }
 
-export function markSupportRequestUnavailable(requestId: string, reason: string) {
+export function markSupportRequestUnavailable(
+  requestId: string,
+  reason: UnavailableReasonCode,
+) {
   return apiFetch<SupportRequest>(`/support-requests/${requestId}/unavailable`, {
     method: 'POST',
     body: JSON.stringify({ reason }),

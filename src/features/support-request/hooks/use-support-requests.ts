@@ -19,7 +19,9 @@ import {
 import {
   SUPPORT_REQUEST_FLOW,
   TERMINAL_REQUEST_STATUSES,
+  type CancelReasonCode,
   type SupportRequestStatus,
+  type UnavailableReasonCode,
 } from '@/features/support-request/types';
 
 export function useStations(query?: string) {
@@ -75,7 +77,7 @@ export function useCancelSupportRequest(requestId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (reason: string) => cancelSupportRequest(requestId, reason),
+    mutationFn: (reason: CancelReasonCode) => cancelSupportRequest(requestId, reason),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
@@ -137,7 +139,8 @@ export function useMarkSupportRequestUnavailable(requestId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (reason: string) => markSupportRequestUnavailable(requestId, reason),
+    mutationFn: (reason: UnavailableReasonCode) =>
+      markSupportRequestUnavailable(requestId, reason),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
