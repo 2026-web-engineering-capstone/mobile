@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { getSupportRequestsWebSocketUrl, getSupportRequestsWebSocketOptions } from '@/lib/api/client';
+import { getSupportRequestsWebSocketUrl } from '@/lib/api/client';
 import { queryKeys } from '@/lib/query/query-keys';
 
 type SupportRequestUpdatedMessage = {
@@ -86,18 +86,7 @@ export function connectSupportRequestsWebSocket(
     }
 
     clearReconnectTimeout();
-    const WebSocketWithOptions = WebSocket as unknown as {
-      new (
-        url: string,
-        protocols?: string | string[],
-        options?: object,
-      ): WebSocket;
-    };
-    const socket = new WebSocketWithOptions(
-      getSupportRequestsWebSocketUrl(),
-      undefined,
-      getSupportRequestsWebSocketOptions(),
-    );
+    const socket = new WebSocket(getSupportRequestsWebSocketUrl());
     activeSocket = socket;
 
     socket.onmessage = (event) => {

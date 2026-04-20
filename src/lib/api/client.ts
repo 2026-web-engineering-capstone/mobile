@@ -13,8 +13,6 @@ export class ApiError extends Error {
 }
 
 const API_PORT = '8000';
-const DEFAULT_APP_ORIGIN = 'http://localhost:8081';
-
 function normalizeLocalhostForAndroid(hostname: string) {
   if (Platform.OS === 'android' && ['localhost', '127.0.0.1'].includes(hostname)) {
     return '10.0.2.2';
@@ -39,11 +37,25 @@ function resolveExpoDevHost() {
   }
 }
 
+function resolveBrowserHostname() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    return null;
+  }
+
+  return normalizeLocalhostForAndroid(window.location.hostname);
+}
+
 function resolveApiBaseUrl() {
   const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 
   if (configuredBaseUrl) {
     return configuredBaseUrl.replace(/\/$/, '');
+  }
+
+  const browserHostname = resolveBrowserHostname();
+
+  if (browserHostname) {
+    return `http://${browserHostname}:${API_PORT}`;
   }
 
   const expoDevHost = resolveExpoDevHost();
@@ -59,24 +71,7 @@ function resolveApiBaseUrl() {
   return `http://localhost:${API_PORT}`;
 }
 
-function resolveAppOrigin() {
-  const configuredAppOrigin = process.env.EXPO_PUBLIC_APP_ORIGIN?.trim();
-
-  if (configuredAppOrigin) {
-    return configuredAppOrigin.replace(/\/$/, '');
-  }
-
-  const expoHostUri = Constants.expoConfig?.hostUri;
-
-  if (expoHostUri) {
-    return `http://${expoHostUri.replace(/\/$/, '')}`;
-  }
-
-  return DEFAULT_APP_ORIGIN;
-}
-
 const API_BASE_URL = resolveApiBaseUrl();
-const APP_ORIGIN = resolveAppOrigin();
 
 function toWebSocketBaseUrl(httpBaseUrl: string) {
   if (httpBaseUrl.startsWith('https://')) {
@@ -92,14 +87,6 @@ function toWebSocketBaseUrl(httpBaseUrl: string) {
 
 export function getSupportRequestsWebSocketUrl() {
   return `${toWebSocketBaseUrl(API_BASE_URL)}/support-requests/ws`;
-}
-
-export function getSupportRequestsWebSocketOptions() {
-  return {
-    headers: {
-      origin: APP_ORIGIN,
-    },
-  };
 }
 
 export async function apiFetch<T>(
