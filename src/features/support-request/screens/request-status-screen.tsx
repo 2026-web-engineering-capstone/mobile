@@ -11,6 +11,17 @@ import {
   SUPPORT_TYPE_LABELS,
 } from '@/features/support-request/store/use-request-draft-store';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
+import {
+  canExposeUnavailableReasonAction,
+  getCurrentLocationSignature,
+  getFailedLocationUploadRetryAfterMs,
+  getNextSuccessfulLocationUpload,
+  getStaleSuccessfulLocationUploadAfterMs,
+  shouldDisableRequestActions,
+  shouldUploadCurrentLocation,
+  type SuccessfulLocationUpload,
+} from '@/features/support-request/screens/request-status-screen.logic';
 import {
   getNextProgressStatus,
   useAssignSupportRequest,
@@ -19,16 +30,18 @@ import {
   useSupportRequest,
   useUpdateSupportRequestChecklist,
   useUpdateSupportRequestStatus,
+  useUploadSupportRequestCurrentLocation,
 } from '@/features/support-request/hooks/use-support-requests';
 import {
+  canPassengerUploadCurrentLocation,
   canStaffAssignSupportRequest,
   canStaffManageSupportRequest,
   canStaffViewSupportRequest,
   CANCELLABLE_REQUEST_STATUSES,
   CANCEL_REASON_LABELS,
-  getCancelReasonLabel,
-  getUnavailableReasonLabel,
+  getSupportRequestStatusGuide,
   STATUS_CHIP_COLORS,
+  STAFF_ORIGIN_PROCESSING_STATUSES,
   SUPPORT_REQUEST_FLOW,
   SUPPORT_REQUEST_STATUS_GUIDES,
   SUPPORT_REQUEST_STATUS_LABELS,
@@ -94,6 +107,12 @@ const UNAVAILABLE_REASON_OPTIONS = Object.entries(
   UNAVAILABLE_REASON_LABELS,
 ) as Array<[UnavailableReasonCode, string]>;
 
+type LocationUploadAttemptState = {
+  requestId: string;
+  signature: string | null;
+  retryAfterMs: number | null;
+};
+
 export function RequestStatusScreen({ requestId }: { requestId: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -107,13 +126,44 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
     SupportRequestChecklistDraftItem[] | null
   >(null);
   const [isChecklistDirty, setIsChecklistDirty] = useState(false);
+  const [locationUploadAttempt, setLocationUploadAttempt] =
+    useState<LocationUploadAttemptState>({
+      requestId,
+      signature: null,
+      retryAfterMs: null,
+    });
+  const [hasPassengerLocationConsent, setHasPassengerLocationConsent] =
+    useState(false);
+  const [lastSuccessfulLocationUpload, setLastSuccessfulLocationUpload] =
+    useState<SuccessfulLocationUpload | null>(null);
   const isChecklistDirtyRef = useRef(false);
+  const activeRequestIdRef = useRef(requestId);
+  activeRequestIdRef.current = requestId;
+  const lastAttemptedLocationSignature =
+    locationUploadAttempt.requestId === requestId
+      ? locationUploadAttempt.signature
+      : null;
+  const failedLocationRetryAfterMs =
+    locationUploadAttempt.requestId === requestId
+      ? locationUploadAttempt.retryAfterMs
+      : null;
   const { data: request, isLoading, error } = useSupportRequest(requestId);
   const cancelMutation = useCancelSupportRequest(requestId);
   const assignMutation = useAssignSupportRequest();
   const updateChecklistMutation = useUpdateSupportRequestChecklist(requestId);
   const updateStatusMutation = useUpdateSupportRequestStatus(requestId);
+  const uploadCurrentLocationMutation = useUploadSupportRequestCurrentLocation(requestId);
   const unavailableMutation = useMarkSupportRequestUnavailable(requestId);
+  const canUploadCurrentLocation = Boolean(
+    request && canPassengerUploadCurrentLocation(request, user),
+  );
+  const isCurrentLocationSharingEnabled =
+    canUploadCurrentLocation && hasPassengerLocationConsent;
+  const {
+    currentLocation,
+    errorMessage: locationErrorMessage,
+    isLoading: isCurrentLocationLoading,
+  } = useCurrentLocation(isCurrentLocationSharingEnabled);
   const requestChecklistDraft = useMemo(
     () => (request ? toChecklistDraft(request.checklist_items) : []),
     [request],
@@ -133,12 +183,168 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
   }, [request, requestChecklistDraft]);
 
   useEffect(() => {
+    setHasPassengerLocationConsent(false);
+    setLocationUploadAttempt({
+      requestId,
+      signature: null,
+      retryAfterMs: null,
+    });
+    setLastSuccessfulLocationUpload(null);
+  }, [requestId]);
+
+  useEffect(() => {
+    const nextSuccessfulLocationUpload = getNextSuccessfulLocationUpload({
+      currentSuccessfulLocationUpload: lastSuccessfulLocationUpload,
+      serverCurrentLocation: request?.current_location ?? null,
+      nowMs: Date.now(),
+    });
+
+    if (nextSuccessfulLocationUpload === lastSuccessfulLocationUpload) {
+      return;
+    }
+
+    setLastSuccessfulLocationUpload(nextSuccessfulLocationUpload);
+
+    if (nextSuccessfulLocationUpload) {
+      setLocationUploadAttempt({
+        requestId,
+        signature: null,
+        retryAfterMs: null,
+      });
+    }
+  }, [lastSuccessfulLocationUpload, requestId, request?.current_location]);
+
+  useEffect(() => {
     isChecklistDirtyRef.current = hasChecklistChanges;
 
     if (isChecklistDirty !== hasChecklistChanges) {
       setIsChecklistDirty(hasChecklistChanges);
     }
   }, [hasChecklistChanges, isChecklistDirty]);
+
+  useEffect(() => {
+    if (failedLocationRetryAfterMs === null) {
+      return;
+    }
+
+    const retryDelayMs = Math.max(failedLocationRetryAfterMs - Date.now(), 0);
+    const retryTimer = setTimeout(() => {
+      setLocationUploadAttempt((current) => {
+        if (
+          current.requestId !== requestId ||
+          current.retryAfterMs !== failedLocationRetryAfterMs
+        ) {
+          return current;
+        }
+
+        return {
+          requestId,
+          signature: null,
+          retryAfterMs: null,
+        };
+      });
+    }, retryDelayMs);
+
+    return () => clearTimeout(retryTimer);
+  }, [failedLocationRetryAfterMs, requestId]);
+
+  useEffect(() => {
+    if (!lastSuccessfulLocationUpload) {
+      return;
+    }
+
+    const staleAtMs = getStaleSuccessfulLocationUploadAfterMs(
+      lastSuccessfulLocationUpload.uploadedAtMs,
+    );
+    const staleDelayMs = Math.max(staleAtMs - Date.now(), 0);
+    const staleTimer = setTimeout(() => {
+      setLastSuccessfulLocationUpload((current) => {
+        if (
+          current?.signature !== lastSuccessfulLocationUpload.signature ||
+          current.uploadedAtMs !== lastSuccessfulLocationUpload.uploadedAtMs
+        ) {
+          return current;
+        }
+
+        return null;
+      });
+    }, staleDelayMs);
+
+    return () => clearTimeout(staleTimer);
+  }, [lastSuccessfulLocationUpload]);
+
+  useEffect(() => {
+    if (
+      !shouldUploadCurrentLocation({
+        canUploadCurrentLocation,
+        currentLocation,
+        failedLocationRetryAfterMs,
+        hasPassengerLocationConsent,
+        isUploadPending: uploadCurrentLocationMutation.isPending,
+        lastAttemptedLocationSignature,
+        lastSuccessfulLocationUpload,
+        nowMs: Date.now(),
+      })
+    ) {
+      return;
+    }
+
+    const nextLocation = currentLocation;
+    const signature = getCurrentLocationSignature(nextLocation);
+    if (!nextLocation || !signature) {
+      return;
+    }
+
+    setLocationUploadAttempt({
+      requestId,
+      signature,
+      retryAfterMs: null,
+    });
+    uploadCurrentLocationMutation.mutate(
+      {
+        latitude: nextLocation.latitude,
+        longitude: nextLocation.longitude,
+        accuracy_meters: nextLocation.accuracy_meters ?? null,
+      },
+      {
+        onSuccess: () => {
+          if (activeRequestIdRef.current !== requestId) {
+            return;
+          }
+
+          setLastSuccessfulLocationUpload({
+            signature,
+            uploadedAtMs: Date.now(),
+          });
+          setLocationUploadAttempt({
+            requestId,
+            signature: null,
+            retryAfterMs: null,
+          });
+        },
+        onError: () => {
+          if (activeRequestIdRef.current !== requestId) {
+            return;
+          }
+
+          setLocationUploadAttempt({
+            requestId,
+            signature,
+            retryAfterMs: getFailedLocationUploadRetryAfterMs(Date.now()),
+          });
+        },
+      },
+    );
+  }, [
+    canUploadCurrentLocation,
+    currentLocation,
+    failedLocationRetryAfterMs,
+    hasPassengerLocationConsent,
+    lastAttemptedLocationSignature,
+    lastSuccessfulLocationUpload,
+    requestId,
+    uploadCurrentLocationMutation,
+  ]);
 
   if (isLoading) {
     return (
@@ -183,8 +389,11 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
     canManageRequest &&
     nextStatus !== null &&
     !TERMINAL_REQUEST_STATUSES.includes(request.status);
-  const canMarkUnavailable =
-    canManageRequest && !TERMINAL_REQUEST_STATUSES.includes(request.status);
+  const canMarkUnavailable = canExposeUnavailableReasonAction({
+    canManageRequest,
+    requestStatus: request.status,
+    unavailableActionStatuses: STAFF_ORIGIN_PROCESSING_STATUSES,
+  });
   const canEditChecklist = canManageRequest;
   const mutationError =
     cancelMutation.error ??
@@ -192,22 +401,25 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
     updateChecklistMutation.error ??
     updateStatusMutation.error ??
     unavailableMutation.error;
-  const isMutating =
-    cancelMutation.isPending ||
-    assignMutation.isPending ||
-    updateChecklistMutation.isPending ||
-    updateStatusMutation.isPending ||
-    unavailableMutation.isPending;
+  const locationUploadError = uploadCurrentLocationMutation.error;
+  const locationSharingStatus = hasPassengerLocationConsent
+    ? request.current_location
+      ? '최근 위치를 공유했습니다.'
+      : currentLocation
+        ? '현재 위치 공유가 활성화되었습니다.'
+        : null
+    : request.current_location
+      ? '이 요청에 최근 공유된 위치가 있습니다. 새 위치 공유는 버튼을 누른 뒤 시작됩니다.'
+      : null;
+  const isMutating = shouldDisableRequestActions({
+    isCancelPending: cancelMutation.isPending,
+    isAssignPending: assignMutation.isPending,
+    isChecklistPending: updateChecklistMutation.isPending,
+    isStatusPending: updateStatusMutation.isPending,
+    isUnavailablePending: unavailableMutation.isPending,
+  });
 
-  const cancelReasonLabel = getCancelReasonLabel(request.cancel_reason);
-  const unavailableReasonLabel = getUnavailableReasonLabel(request.unavailable_reason);
-  const currentGuide = cancelReasonLabel
-    ? `취소 사유: ${cancelReasonLabel}`
-    : unavailableReasonLabel
-      ? `지원 불가 사유: ${unavailableReasonLabel}`
-      : request.completion_note
-        ? `완료 메모: ${request.completion_note}`
-        : SUPPORT_REQUEST_STATUS_GUIDES[request.status];
+  const currentGuide = getSupportRequestStatusGuide(request);
 
   if (!canViewRequest) {
     return <Redirect href="/(app)/(tabs)" />;
@@ -398,6 +610,46 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
               </Text>
             </Card.Body>
           </Card>
+
+          {canUploadCurrentLocation ? (
+            <Card className="rounded-2xl border border-brand/20 dark:border-brand-dark/20">
+              <Card.Body className="gap-3 p-4">
+                <Text className="text-sm font-semibold text-brand dark:text-brand-dark">
+                  현재 위치 공유
+                </Text>
+                <Text className="text-sm leading-5 text-default-500">
+                  {hasPassengerLocationConsent
+                    ? '위치 공유를 시작했습니다. 요청이 접수, 배정, 지원 중일 때만 현재 위치가 역무원에게 전송됩니다.'
+                    : '위치 공유는 버튼을 누른 뒤에만 시작됩니다. 시작 후에는 요청이 접수, 배정, 지원 중일 때만 현재 위치가 역무원에게 전송됩니다.'}
+                </Text>
+                {!hasPassengerLocationConsent ? (
+                  <Button
+                    size="sm"
+                    className="self-start rounded-xl bg-brand dark:bg-brand-dark"
+                    onPress={() => setHasPassengerLocationConsent(true)}
+                  >
+                    위치 공유 시작
+                  </Button>
+                ) : null}
+                {locationSharingStatus ? (
+                  <Text className="text-xs text-default-400">
+                    {locationSharingStatus}
+                  </Text>
+                ) : null}
+                {isCurrentLocationLoading ? (
+                  <Text className="text-xs text-default-400">현재 위치를 확인하고 있습니다.</Text>
+                ) : null}
+                {locationErrorMessage ? (
+                  <Text className="text-xs text-danger">{locationErrorMessage}</Text>
+                ) : null}
+                {hasPassengerLocationConsent && locationUploadError ? (
+                  <Text className="text-xs text-danger">
+                    현재 위치 공유에 실패했습니다. 잠시 후 다시 시도합니다.
+                  </Text>
+                ) : null}
+              </Card.Body>
+            </Card>
+          ) : null}
 
           {request.checklist_items.length > 0 ? (
             <Card className="rounded-2xl">

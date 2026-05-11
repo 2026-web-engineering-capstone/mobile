@@ -12,7 +12,8 @@
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/lib/use-latest-callback.test.ts src/features/home/hooks/use-current-location.test.ts src/features/support-request/types.test.ts src/features/support-request/screens/request-status-screen.logic.test.ts"
   },
   "dependencies": {
     "@mj-studio/react-native-naver-map": "^2.7.0",

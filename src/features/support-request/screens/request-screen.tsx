@@ -74,28 +74,67 @@ export function RequestScreen() {
   } = useRequestDraftStore();
 
   const hasStations = stations.length > 0;
+  const isCreatingRequest = createRequestMutation.isPending;
+  const canSelectStations = !isStationsLoading && !stationsError && hasStations;
   const selectedOriginStation = stations.find((station) => station.id === originStationId);
   const selectedDestinationStation = stations.find(
     (station) => station.id === destinationStationId,
   );
   const originStation = selectedOriginStation?.name ?? '출발역 선택';
   const destinationStation = selectedDestinationStation?.name ?? '도착역 선택';
-  const hasValidStationSelection = Boolean(
-    selectedOriginStation && selectedDestinationStation,
+  const hasSameStationSelection = Boolean(
+    originStationId &&
+      destinationStationId &&
+      originStationId === destinationStationId,
   );
+  const hasValidStationSelection = Boolean(
+    selectedOriginStation && selectedDestinationStation && !hasSameStationSelection,
+  );
+  const routeValidationMessage = (() => {
+    if (!canSelectStations) {
+      return null;
+    }
+
+    if (!originStationId && !destinationStationId) {
+      return '출발역과 도착역을 모두 선택해주세요.';
+    }
+
+    if (!originStationId) {
+      return '출발역을 선택해주세요.';
+    }
+
+    if (!destinationStationId) {
+      return '도착역을 선택해주세요.';
+    }
+
+    if (hasSameStationSelection) {
+      return '출발역과 도착역은 서로 달라야 합니다.';
+    }
+
+    if (!hasValidStationSelection) {
+      return '선택한 역 정보를 다시 확인해주세요.';
+    }
+
+    return null;
+  })();
+  const supportTypeValidationMessage =
+    supportTypes.length === 0 ? '지원 유형을 하나 이상 선택해주세요.' : null;
+  const supportTypeSummary =
+    supportTypes.length > 0
+      ? supportTypes.map((type) => SUPPORT_TYPE_LABELS[type]).join(', ')
+      : '지원 유형 미선택';
   const isSubmitDisabled =
-    !hasStations ||
+    !canSelectStations ||
     !hasValidStationSelection ||
-    originStationId === destinationStationId ||
     supportTypes.length === 0 ||
-    createRequestMutation.isPending;
+    isCreatingRequest;
 
   if (role !== 'passenger') {
     return <Redirect href="/(app)/(tabs)" />;
   }
 
   const handleSubmit = () => {
-    if (!hasValidStationSelection || supportTypes.length === 0) {
+    if (!canSelectStations || !hasValidStationSelection || supportTypes.length === 0) {
       return;
     }
 
@@ -180,6 +219,16 @@ export function RequestScreen() {
             </Card>
           ) : null}
 
+          {isCreatingRequest ? (
+            <Card className="rounded-2xl border border-brand/20 dark:border-brand-dark/20">
+              <Card.Body className="p-4">
+                <Text className="text-sm text-brand dark:text-brand-dark">
+                  요청을 제출하는 중입니다. 잠시만 기다려주세요.
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
+
           <Card className="rounded-2xl">
             <Card.Body className="gap-4 p-4">
               <Text className="text-xs font-semibold tracking-wider text-default-400">
@@ -191,7 +240,10 @@ export function RequestScreen() {
                     출발역
                   </Text>
                   <Pressable
-                    className="rounded-xl border border-default-200 bg-background px-4 py-3"
+                    className={`rounded-xl border border-default-200 bg-background px-4 py-3 ${
+                      canSelectStations && !isCreatingRequest ? '' : 'opacity-50'
+                    }`}
+                    disabled={!canSelectStations || isCreatingRequest}
                     onPress={() =>
                       router.push({
                         pathname: '/(app)/stations/search',
@@ -215,6 +267,7 @@ export function RequestScreen() {
                       <Chip
                         key={`origin-${station.id}`}
                         variant={originStationId === station.id ? 'primary' : 'soft'}
+                        disabled={!canSelectStations || isCreatingRequest}
                         className={
                           originStationId === station.id
                             ? 'bg-brand dark:bg-brand-dark'
@@ -240,7 +293,10 @@ export function RequestScreen() {
                     도착역
                   </Text>
                   <Pressable
-                    className="rounded-xl border border-default-200 bg-background px-4 py-3"
+                    className={`rounded-xl border border-default-200 bg-background px-4 py-3 ${
+                      canSelectStations && !isCreatingRequest ? '' : 'opacity-50'
+                    }`}
+                    disabled={!canSelectStations || isCreatingRequest}
                     onPress={() =>
                       router.push({
                         pathname: '/(app)/stations/search',
@@ -264,6 +320,7 @@ export function RequestScreen() {
                       <Chip
                         key={`destination-${station.id}`}
                         variant={destinationStationId === station.id ? 'primary' : 'soft'}
+                        disabled={!canSelectStations || isCreatingRequest}
                         className={
                           destinationStationId === station.id
                             ? 'bg-brand dark:bg-brand-dark'
@@ -284,6 +341,9 @@ export function RequestScreen() {
                   </ScrollView>
                 </View>
               </View>
+              {routeValidationMessage ? (
+                <Text className="text-xs text-warning">{routeValidationMessage}</Text>
+              ) : null}
             </Card.Body>
           </Card>
 
@@ -301,6 +361,7 @@ export function RequestScreen() {
                     <Chip
                       key={key}
                       variant={selected ? 'primary' : 'soft'}
+                      disabled={isCreatingRequest}
                       className={selected ? 'bg-brand dark:bg-brand-dark' : ''}
                       onPress={() => toggleSupportType(key)}
                     >
@@ -309,6 +370,11 @@ export function RequestScreen() {
                   );
                 })}
               </View>
+              {supportTypeValidationMessage ? (
+                <Text className="text-xs text-warning">
+                  {supportTypeValidationMessage}
+                </Text>
+              ) : null}
             </Card.Body>
           </Card>
 
@@ -325,8 +391,13 @@ export function RequestScreen() {
                   return (
                     <Pressable
                       key={key}
+                      disabled={isCreatingRequest}
                       onPress={() => setMeetingPoint(key)}
-                      className={`rounded-full border px-4 py-2 ${selected ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark' : 'border-default-200 bg-background'}`}
+                      className={`rounded-full border px-4 py-2 ${
+                        selected
+                          ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark'
+                          : 'border-default-200 bg-background'
+                      } ${isCreatingRequest ? 'opacity-50' : ''}`}
                     >
                       <Text
                         className={`text-sm ${selected ? 'font-semibold text-brand dark:text-brand-dark' : 'text-default-600'}`}
@@ -352,6 +423,7 @@ export function RequestScreen() {
                 placeholder="예: 전동휠체어 사용, 동행자 1명 있음"
                 placeholderTextColor={undefined}
                 textAlignVertical="top"
+                editable={!isCreatingRequest}
                 value={notes}
                 onChangeText={setNotes}
               />
@@ -370,8 +442,7 @@ export function RequestScreen() {
                 {originStation} → {destinationStation}
               </Text>
               <Text className="text-sm text-default-600">
-                {supportTypes.map((type) => SUPPORT_TYPE_LABELS[type]).join(', ')} ·{' '}
-                {MEETING_POINT_LABELS[meetingPoint]}
+                {supportTypeSummary} · {MEETING_POINT_LABELS[meetingPoint]}
               </Text>
               {notes ? (
                 <Text className="text-xs text-default-400">메모: {notes}</Text>
@@ -391,7 +462,7 @@ export function RequestScreen() {
           isDisabled={isSubmitDisabled}
           onPress={handleSubmit}
         >
-          지원 요청하기
+          {isCreatingRequest ? '요청 제출 중...' : '지원 요청하기'}
         </Button>
       </View>
     </View>

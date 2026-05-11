@@ -14,7 +14,9 @@ import {
   markSupportRequestUnavailable,
   updateSupportRequestChecklist,
   updateSupportRequestStatus,
+  uploadSupportRequestCurrentLocation,
   type CreateSupportRequestPayload,
+  type UploadSupportRequestCurrentLocationPayload,
 } from '@/features/support-request/api/support-requests';
 import {
   SUPPORT_REQUEST_FLOW,
@@ -128,6 +130,19 @@ export function useUpdateSupportRequestStatus(requestId: string) {
         trainCarNumber,
         completionNote,
       }),
+    onSuccess: async (updated) => {
+      queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
+    },
+  });
+}
+
+export function useUploadSupportRequestCurrentLocation(requestId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UploadSupportRequestCurrentLocationPayload) =>
+      uploadSupportRequestCurrentLocation(requestId, payload),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });

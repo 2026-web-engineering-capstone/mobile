@@ -21,6 +21,13 @@ export type SupportRequestChecklistItem = {
   checked: boolean;
 };
 
+export type SupportRequestCurrentLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy_meters: number | null;
+  recorded_at: string | null;
+};
+
 export type SupportRequestChecklistDraftItem = Pick<
   SupportRequestChecklistItem,
   'code' | 'label' | 'checked'
@@ -30,6 +37,7 @@ export type SupportRequestEvent = {
   id: number;
   type: string;
   actor_name: string;
+  actor_role: SessionUser['role'];
   from_status: SupportRequestStatus | null;
   to_status: SupportRequestStatus | null;
   message: string;
@@ -46,7 +54,7 @@ export type UnavailableReasonCode =
   | 'urgent_duty'
   | 'support_unavailable';
 
-export type SupportRequest = {
+export type SupportRequestListItem = {
   id: string;
   status: SupportRequestStatus;
   origin_station_id: string;
@@ -55,16 +63,20 @@ export type SupportRequest = {
   destination_station_name: string;
   support_types: SupportType[];
   meeting_point: MeetingPoint;
-  notes: string;
   passenger_name: string;
   assigned_staff_name: string | null;
   train_car_number: string | null;
   created_at: string;
+};
+
+export type SupportRequestDetail = SupportRequestListItem & {
   passenger_id: string;
   assigned_staff_id: string | null;
+  notes: string;
   cancel_reason: CancelReasonCode | null;
   unavailable_reason: UnavailableReasonCode | null;
   completion_note: string | null;
+  current_location: SupportRequestCurrentLocation | null;
   checklist_items: SupportRequestChecklistItem[];
   events: SupportRequestEvent[];
 };
@@ -99,6 +111,69 @@ export const CANCELLABLE_REQUEST_STATUSES: SupportRequestStatus[] = [
   'submitted',
   'assigned',
 ];
+
+export const LOCATION_UPLOAD_ALLOWED_STATUSES: SupportRequestStatus[] = [
+  'submitted',
+  'assigned',
+  'in_progress',
+];
+
+export const STAFF_ORIGIN_PROCESSING_STATUSES: SupportRequestStatus[] = [
+  'submitted',
+  'assigned',
+  'in_progress',
+];
+
+export const STAFF_HANDOFF_STATUSES: SupportRequestStatus[] = [
+  'boarded',
+  'awaiting_dropoff',
+];
+
+const STAFF_CURRENT_LOCATION_VISIBLE_STATUSES: SupportRequestStatus[] = [
+  'submitted',
+  'assigned',
+  'in_progress',
+];
+
+export type StaffQueueItemKind =
+  | 'origin_processing'
+  | 'destination_handoff'
+  | 'origin_handoff_monitoring';
+
+export type StaffQueueItemClassification = {
+  kind: StaffQueueItemKind;
+  label: string;
+  description: string;
+  isActionable: boolean;
+  sortPriority: number;
+};
+
+const STAFF_QUEUE_CLASSIFICATIONS: Record<
+  StaffQueueItemKind,
+  StaffQueueItemClassification
+> = {
+  origin_processing: {
+    kind: 'origin_processing',
+    label: '출발역 처리',
+    description: '승객 만남부터 승차 완료까지 처리할 요청입니다.',
+    isActionable: true,
+    sortPriority: 0,
+  },
+  destination_handoff: {
+    kind: 'destination_handoff',
+    label: '하차역 인계',
+    description: '열차 도착 후 하차 지원을 처리할 요청입니다.',
+    isActionable: true,
+    sortPriority: 1,
+  },
+  origin_handoff_monitoring: {
+    kind: 'origin_handoff_monitoring',
+    label: '인계 모니터링',
+    description: '하차 역 인계 진행 상황을 확인하는 요청입니다.',
+    isActionable: false,
+    sortPriority: 2,
+  },
+};
 
 export const CANCEL_REASON_LABELS: Record<CancelReasonCode, string> = {
   change_of_plans: '일정이 변경되었어요.',
@@ -147,6 +222,29 @@ export const SUPPORT_REQUEST_STATUS_GUIDES: Record<SupportRequestStatus, string>
   unavailable: '현재 요청을 지원할 수 없는 상태입니다.',
 };
 
+export function getSupportRequestStatusGuide(
+  request: Pick<
+    SupportRequestDetail,
+    'status' | 'cancel_reason' | 'unavailable_reason' | 'completion_note'
+  >,
+) {
+  const cancelReasonLabel = getCancelReasonLabel(request.cancel_reason);
+  if (cancelReasonLabel) {
+    return `취소 사유: ${cancelReasonLabel}`;
+  }
+
+  const unavailableReasonLabel = getUnavailableReasonLabel(request.unavailable_reason);
+  if (unavailableReasonLabel) {
+    return `지원 불가 사유: ${unavailableReasonLabel}`;
+  }
+
+  if (request.completion_note) {
+    return `완료 메모: ${request.completion_note}`;
+  }
+
+  return SUPPORT_REQUEST_STATUS_GUIDES[request.status];
+}
+
 export const STATUS_CHIP_COLORS: Record<
   SupportRequestStatus,
   'accent' | 'success' | 'warning' | 'danger' | 'default'
@@ -161,8 +259,54 @@ export const STATUS_CHIP_COLORS: Record<
   unavailable: 'warning',
 };
 
+export function getStaffQueueItemClassification(
+  request: Pick<
+    SupportRequestListItem,
+    'origin_station_id' | 'destination_station_id' | 'status'
+  >,
+  user: SessionUser | null,
+) {
+  if (!user || user.role !== 'staff' || !user.station_id) {
+    return null;
+  }
+
+  if (TERMINAL_REQUEST_STATUSES.includes(request.status)) {
+    return null;
+  }
+
+  if (
+    user.station_id === request.destination_station_id &&
+    STAFF_HANDOFF_STATUSES.includes(request.status)
+  ) {
+    return STAFF_QUEUE_CLASSIFICATIONS.destination_handoff;
+  }
+
+  if (
+    user.station_id === request.origin_station_id &&
+    STAFF_ORIGIN_PROCESSING_STATUSES.includes(request.status)
+  ) {
+    return STAFF_QUEUE_CLASSIFICATIONS.origin_processing;
+  }
+
+  if (
+    user.station_id === request.origin_station_id &&
+    STAFF_HANDOFF_STATUSES.includes(request.status)
+  ) {
+    return STAFF_QUEUE_CLASSIFICATIONS.origin_handoff_monitoring;
+  }
+
+  return null;
+}
+
+export function canStaffViewSupportRequestListItem(
+  request: SupportRequestListItem,
+  user: SessionUser | null,
+) {
+  return getStaffQueueItemClassification(request, user) !== null;
+}
+
 export function canStaffViewSupportRequest(
-  request: SupportRequest,
+  request: SupportRequestDetail,
   user: SessionUser | null,
 ) {
   if (!user || user.role !== 'staff') {
@@ -173,27 +317,11 @@ export function canStaffViewSupportRequest(
     return true;
   }
 
-  if (
-    user.station_id === request.origin_station_id &&
-    [
-      'submitted',
-      'assigned',
-      'in_progress',
-      'boarded',
-      'awaiting_dropoff',
-    ].includes(request.status)
-  ) {
-    return true;
-  }
-
-  return (
-    user.station_id === request.destination_station_id &&
-    ['boarded', 'awaiting_dropoff'].includes(request.status)
-  );
+  return canStaffViewSupportRequestListItem(request, user);
 }
 
 export function canStaffManageSupportRequest(
-  request: SupportRequest,
+  request: SupportRequestDetail,
   user: SessionUser | null,
 ) {
   if (!user || user.role !== 'staff') {
@@ -204,7 +332,7 @@ export function canStaffManageSupportRequest(
     return false;
   }
 
-  if (['boarded', 'awaiting_dropoff'].includes(request.status)) {
+  if (STAFF_HANDOFF_STATUSES.includes(request.status)) {
     return user.station_id === request.destination_station_id;
   }
 
@@ -212,7 +340,7 @@ export function canStaffManageSupportRequest(
 }
 
 export function canStaffAssignSupportRequest(
-  request: SupportRequest,
+  request: SupportRequestDetail,
   user: SessionUser | null,
 ) {
   if (!user || user.role !== 'staff') {
@@ -226,15 +354,40 @@ export function canStaffAssignSupportRequest(
   );
 }
 
+export function canPassengerUploadCurrentLocation(
+  request: SupportRequestDetail,
+  user: SessionUser | null,
+) {
+  return Boolean(
+    user &&
+      user.role === 'passenger' &&
+      request.passenger_id === user.id &&
+      LOCATION_UPLOAD_ALLOWED_STATUSES.includes(request.status),
+  );
+}
+
+export function canStaffViewPassengerCurrentLocation(
+  request: SupportRequestDetail,
+  user: SessionUser | null,
+) {
+  return Boolean(
+    request.current_location &&
+      user &&
+      user.role === 'staff' &&
+      user.station_id === request.origin_station_id &&
+      STAFF_CURRENT_LOCATION_VISIBLE_STATUSES.includes(request.status),
+  );
+}
+
 export function isDestinationHandoffStaff(
-  request: SupportRequest,
+  request: SupportRequestListItem,
   user: SessionUser | null,
 ) {
   return Boolean(
     user &&
       user.role === 'staff' &&
       user.station_id === request.destination_station_id &&
-      ['boarded', 'awaiting_dropoff'].includes(request.status),
+      STAFF_HANDOFF_STATUSES.includes(request.status),
   );
 }
 

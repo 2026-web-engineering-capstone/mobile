@@ -13,6 +13,7 @@ import {
 import { useSupportRequest } from '@/features/support-request/hooks/use-support-requests';
 import {
   canStaffManageSupportRequest,
+  canStaffViewPassengerCurrentLocation,
   canStaffViewSupportRequest,
   getCancelReasonLabel,
   getUnavailableReasonLabel,
@@ -32,6 +33,18 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       </Text>
     </View>
   );
+}
+
+function formatCoordinate(value: number) {
+  return value.toFixed(4);
+}
+
+function formatAccuracyMeters(value: number | null) {
+  if (value === null) {
+    return '알 수 없음';
+  }
+
+  return `${value}m`;
 }
 
 function formatDateTime(value: string) {
@@ -81,6 +94,9 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
   const canViewRequest =
     (role === 'passenger' && request.passenger_id === user?.id) ||
     canStaffViewSupportRequest(request, user);
+  const passengerCurrentLocation = canStaffViewPassengerCurrentLocation(request, user)
+    ? request.current_location
+    : null;
   const cancelReasonLabel = getCancelReasonLabel(request.cancel_reason);
   const unavailableReasonLabel = getUnavailableReasonLabel(request.unavailable_reason);
   const currentGuide = cancelReasonLabel
@@ -182,6 +198,26 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
               <Text className="text-sm leading-5 text-default-600">{currentGuide}</Text>
             </Card.Body>
           </Card>
+
+          {passengerCurrentLocation ? (
+            <Card className="rounded-2xl border border-default-200">
+              <Card.Body className="gap-2 p-4">
+                <Text className="text-sm font-semibold text-foreground">
+                  승객 현재 위치
+                </Text>
+                <Text className="text-sm leading-5 text-default-500">
+                  위도 {formatCoordinate(passengerCurrentLocation.latitude)} · 경도{' '}
+                  {formatCoordinate(passengerCurrentLocation.longitude)}
+                </Text>
+                <Text className="text-xs text-default-400">
+                  정확도 {formatAccuracyMeters(passengerCurrentLocation.accuracy_meters)} · 업데이트{' '}
+                  {passengerCurrentLocation.recorded_at
+                    ? formatDateTime(passengerCurrentLocation.recorded_at)
+                    : '알 수 없음'}
+                </Text>
+              </Card.Body>
+            </Card>
+          ) : null}
         </View>
       </ScrollView>
 

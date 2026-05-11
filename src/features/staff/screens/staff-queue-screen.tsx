@@ -11,10 +11,10 @@ import {
 } from '@/features/support-request/store/use-request-draft-store';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import {
-  canStaffViewSupportRequest,
+  getStaffQueueItemClassification,
   STATUS_CHIP_COLORS,
   SUPPORT_REQUEST_STATUS_LABELS,
-  TERMINAL_REQUEST_STATUSES,
+  type StaffQueueItemClassification,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -23,11 +23,31 @@ export function StaffQueueScreen() {
   const insets = useSafeAreaInsets();
   const { role, user } = useAuth();
   const { data = [], isLoading, error } = useSupportRequests(role === 'staff');
-  const queueItems = data.filter(
-    (item) =>
-      !TERMINAL_REQUEST_STATUSES.includes(item.status) &&
-      canStaffViewSupportRequest(item, user),
-  );
+  const queueItems = data
+    .reduce<
+      Array<{
+        item: (typeof data)[number];
+        classification: StaffQueueItemClassification;
+      }>
+    >((items, item) => {
+      const classification = getStaffQueueItemClassification(item, user);
+
+      if (classification) {
+        items.push({ item, classification });
+      }
+
+      return items;
+    }, [])
+    .sort((left, right) => {
+      const priorityDiff =
+        left.classification.sortPriority - right.classification.sortPriority;
+
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return Date.parse(right.item.created_at) - Date.parse(left.item.created_at);
+    });
 
   if (role !== 'staff') {
     return <Redirect href="/(app)/(tabs)" />;
@@ -49,7 +69,7 @@ export function StaffQueueScreen() {
               역무원 요청 큐
             </Text>
             <Text className="text-sm text-default-400">
-              현재 처리해야 할 지원 요청을 확인하세요
+              현재 확인해야 할 지원 요청을 확인하세요
             </Text>
           </View>
 
@@ -84,7 +104,7 @@ export function StaffQueueScreen() {
           ) : null}
 
           <View className="gap-3">
-            {queueItems.map((item) => (
+            {queueItems.map(({ item, classification }) => (
               <Pressable
                 key={item.id}
                 onPress={() => router.push(`/(app)/support/${item.id}`)}
@@ -99,14 +119,26 @@ export function StaffQueueScreen() {
                         <Text className="text-xs text-default-400">
                           요청자 {item.passenger_name}
                         </Text>
+                        <Text className="text-xs leading-4 text-default-500">
+                          {classification.description}
+                        </Text>
                       </View>
-                      <Chip
-                        variant="soft"
-                        color={STATUS_CHIP_COLORS[item.status]}
-                        size="sm"
-                      >
-                        {SUPPORT_REQUEST_STATUS_LABELS[item.status]}
-                      </Chip>
+                      <View className="items-end gap-2">
+                        <Chip
+                          variant="soft"
+                          color={STATUS_CHIP_COLORS[item.status]}
+                          size="sm"
+                        >
+                          {SUPPORT_REQUEST_STATUS_LABELS[item.status]}
+                        </Chip>
+                        <Chip
+                          variant="soft"
+                          color={classification.isActionable ? 'accent' : 'default'}
+                          size="sm"
+                        >
+                          {classification.label}
+                        </Chip>
+                      </View>
                     </View>
                     <Separator />
                     <View className="flex-row items-center justify-between gap-3">

@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Card } from 'heroui-native/card';
 import { Chip } from 'heroui-native/chip';
@@ -14,6 +14,7 @@ import {
   SUPPORT_REQUEST_STATUS_LABELS,
   TERMINAL_REQUEST_STATUSES,
 } from '@/features/support-request/types';
+import { useAuth } from '@/providers/auth-provider';
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -34,10 +35,16 @@ function formatDateTime(value: string) {
 export function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data = [], isLoading, error } = useSupportRequests(true, false);
+  const { role } = useAuth();
+  const isPassenger = role === 'passenger';
+  const { data = [], isLoading, error } = useSupportRequests(isPassenger, false);
   const historyItems = data.filter((item) =>
     TERMINAL_REQUEST_STATUSES.includes(item.status),
   );
+
+  if (!isPassenger) {
+    return <Redirect href="/(app)/(tabs)" />;
+  }
 
   return (
     <View className="flex-1 bg-background">
@@ -52,10 +59,10 @@ export function HistoryScreen() {
         <View className="gap-5 px-5">
           <View className="gap-1">
             <Text className="text-2xl font-bold tracking-tight text-foreground">
-              이용 내역
+              완료된 이용 내역
             </Text>
             <Text className="text-sm text-default-400">
-              총 {historyItems.length}건의 지원 요청 기록
+              완료, 취소, 지원 불가로 종료된 요청 {historyItems.length}건
             </Text>
           </View>
 
@@ -83,7 +90,7 @@ export function HistoryScreen() {
             <Card className="rounded-2xl">
               <Card.Body className="p-4">
                 <Text className="text-sm text-default-500">
-                  아직 완료되거나 종료된 요청이 없습니다.
+                  아직 종료된 요청이 없습니다. 진행 중인 요청은 홈에서 확인해주세요.
                 </Text>
               </Card.Body>
             </Card>
