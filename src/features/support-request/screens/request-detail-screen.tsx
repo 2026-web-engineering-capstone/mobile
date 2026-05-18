@@ -218,6 +218,29 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
               </Card.Body>
             </Card>
           ) : null}
+
+          {role === 'passenger' && request.status === 'unavailable' ? (
+            <Card className="rounded-2xl border border-warning/30">
+              <Card.Body className="gap-3 p-4">
+                <Text className="text-sm font-semibold text-warning">
+                  지원이 어려운 상황입니다
+                </Text>
+                <Text className="text-sm leading-6 text-default-600">
+                  다음 방법을 시도해 보세요.{'\n'}
+                  • 조금 뒤 다시 요청하기{'\n'}
+                  • 다른 출발/도착 역 조합으로 요청{'\n'}
+                  • 가까운 역무원·고객안내센터에 직접 문의
+                </Text>
+                <Button
+                  size="md"
+                  className="rounded-xl bg-brand dark:bg-brand-dark"
+                  onPress={() => router.push('/(app)/(tabs)/request')}
+                >
+                  다시 요청하기
+                </Button>
+              </Card.Body>
+            </Card>
+          ) : null}
         </View>
       </ScrollView>
 
