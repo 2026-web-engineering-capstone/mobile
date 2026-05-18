@@ -3,9 +3,14 @@ import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
-import { Chip } from 'heroui-native/chip';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ErrorView,
+  LoadingView,
+  StatusChip,
+  StatusTimeline,
+} from '@/components/ui';
 import {
   MEETING_POINT_LABELS,
   SUPPORT_TYPE_LABELS,
@@ -17,9 +22,7 @@ import {
   canStaffViewSupportRequest,
   getCancelReasonLabel,
   getUnavailableReasonLabel,
-  STATUS_CHIP_COLORS,
   SUPPORT_REQUEST_STATUS_GUIDES,
-  SUPPORT_REQUEST_STATUS_LABELS,
   TERMINAL_REQUEST_STATUSES,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
@@ -71,18 +74,32 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text className="text-sm text-default-500">요청 정보를 불러오는 중입니다.</Text>
+      <View className="flex-1 bg-background">
+        <StatusBar style="auto" />
+        <View
+          className="flex-1 items-center justify-center px-6"
+          style={{ paddingTop: insets.top }}
+        >
+          <LoadingView label="요청 정보를 불러오고 있어요" />
+        </View>
       </View>
     );
   }
 
   if (error || !request) {
     return (
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text className="text-center text-sm text-danger">
-          요청 정보를 불러오지 못했습니다.
-        </Text>
+      <View className="flex-1 bg-background">
+        <StatusBar style="auto" />
+        <View
+          className="flex-1 items-center justify-center px-6"
+          style={{ paddingTop: insets.top }}
+        >
+          <ErrorView
+            title="요청 정보를 불러오지 못했어요"
+            message="잠시 후 다시 시도하거나 뒤로 가서 다시 진입해 주세요."
+            onRetry={() => router.back()}
+          />
+        </View>
       </View>
     );
   }
@@ -124,29 +141,24 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
         <View className="gap-6 px-5">
           <View className="flex-row items-center justify-between">
             <View className="gap-1">
-              <Text className="text-2xl font-bold tracking-tight text-foreground">
+              <Text className="text-xs font-semibold uppercase tracking-widest text-brand dark:text-brand-dark">
                 요청 상세
+              </Text>
+              <Text className="text-2xl font-bold tracking-tight text-foreground">
+                {request.origin_station_name} → {request.destination_station_name}
               </Text>
               <Text className="text-xs text-default-400">{request.id}</Text>
             </View>
-            <Chip
-              variant="soft"
-              color={STATUS_CHIP_COLORS[request.status]}
-              size="sm"
-            >
-              {SUPPORT_REQUEST_STATUS_LABELS[request.status]}
-            </Chip>
+            <StatusChip status={request.status} />
           </View>
 
-          <Card className="rounded-2xl bg-brand-surface dark:bg-brand-surface-dark">
-            <Card.Body className="items-center gap-2 p-5">
-              <Text className="text-lg font-bold text-brand dark:text-brand-dark">
-                {request.origin_station_name}
+          {/* 8 상태 가로 타임라인 */}
+          <Card className="rounded-2xl">
+            <Card.Body className="gap-3 p-4">
+              <Text className="text-xs font-semibold uppercase tracking-widest text-default-400">
+                진행 상황
               </Text>
-              <Text className="text-default-400">↓</Text>
-              <Text className="text-lg font-bold text-brand dark:text-brand-dark">
-                {request.destination_station_name}
-              </Text>
+              <StatusTimeline current={request.status} />
             </Card.Body>
           </Card>
 
