@@ -116,6 +116,7 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { role, user } = useAuth();
+  const [trainNumberInput, setTrainNumberInput] = useState('');
   const [trainCarNumberInput, setTrainCarNumberInput] = useState('');
   const [cancelReasonInput, setCancelReasonInput] = useState<CancelReasonCode | null>(null);
   const [unavailableReasonInput, setUnavailableReasonInput] =
@@ -393,8 +394,11 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
   const canManageRequest = canStaffManageSupportRequest(request, user);
   const requiresTrainCarInput =
     nextStatus === 'boarded' && !request.train_car_number;
+  const requiresTrainNumberInput =
+    nextStatus === 'boarded' && !request.train_number;
   const requiresCompletionNote = nextStatus === 'completed';
   const hasValidTrainCarInput = /^\d{1,2}$/.test(trainCarNumberInput.trim());
+  const hasValidTrainNumberInput = trainNumberInput.trim().length > 0;
   const hasValidCancelReason = cancelReasonInput !== null;
   const hasValidUnavailableReason = unavailableReasonInput !== null;
   const hasValidCompletionNote = completionNoteInput.trim().length > 0;
@@ -443,8 +447,13 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
       return;
     }
 
-    if (nextStatus === 'boarded' && !request.train_car_number && !hasValidTrainCarInput) {
-      return;
+    if (nextStatus === 'boarded') {
+      if (!request.train_car_number && !hasValidTrainCarInput) {
+        return;
+      }
+      if (!request.train_number && !hasValidTrainNumberInput) {
+        return;
+      }
     }
 
     if (nextStatus === 'completed' && !hasValidCompletionNote) {
@@ -453,6 +462,10 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
 
     updateStatusMutation.mutate({
       status: nextStatus,
+      trainNumber:
+        nextStatus === 'boarded'
+          ? request.train_number ?? trainNumberInput.trim()
+          : undefined,
       trainCarNumber:
         nextStatus === 'boarded'
           ? request.train_car_number ?? trainCarNumberInput.trim()
@@ -730,23 +743,56 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
             </Card>
           ) : null}
 
-          {requiresTrainCarInput ? (
+          {requiresTrainNumberInput || requiresTrainCarInput ? (
             <Card className="rounded-2xl">
-              <Card.Body className="gap-3 p-4">
+              <Card.Body className="gap-4 p-4">
                 <Text className="text-sm font-semibold text-foreground">
-                  탑승 칸 번호 입력
+                  탑승 열차 정보
                 </Text>
-                <TextInput
-                  className="rounded-xl bg-default-100 px-4 py-3 text-sm text-foreground"
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  placeholder="예: 4"
-                  placeholderTextColor={undefined}
-                  value={trainCarNumberInput}
-                  onChangeText={(value) =>
-                    setTrainCarNumberInput(value.replace(/[^0-9]/g, ''))
-                  }
-                />
+                <Text className="text-xs text-default-400">
+                  하차 역에 자동 공유돼요. 열차 번호와 칸 번호 모두 입력해야
+                  승차 완료 처리가 가능합니다.
+                </Text>
+
+                {requiresTrainNumberInput ? (
+                  <View className="gap-1.5">
+                    <Text className="text-xs font-semibold text-default-500">
+                      열차 번호
+                    </Text>
+                    <TextInput
+                      className="rounded-xl bg-default-100 px-4 py-3 text-base text-foreground"
+                      style={{ minHeight: 44 }}
+                      maxLength={16}
+                      placeholder="예: 4567 또는 K1234"
+                      placeholderTextColor={undefined}
+                      value={trainNumberInput}
+                      onChangeText={setTrainNumberInput}
+                      autoCapitalize="characters"
+                      accessibilityLabel="열차 번호 입력"
+                    />
+                  </View>
+                ) : null}
+
+                {requiresTrainCarInput ? (
+                  <View className="gap-1.5">
+                    <Text className="text-xs font-semibold text-default-500">
+                      칸 번호
+                    </Text>
+                    <TextInput
+                      className="rounded-xl bg-default-100 px-4 py-3 text-base text-foreground"
+                      style={{ minHeight: 44 }}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      placeholder="예: 4"
+                      placeholderTextColor={undefined}
+                      value={trainCarNumberInput}
+                      onChangeText={(value) =>
+                        setTrainCarNumberInput(value.replace(/[^0-9]/g, ''))
+                      }
+                      accessibilityLabel="열차 칸 번호 입력"
+                    />
+                  </View>
+                ) : null}
               </Card.Body>
             </Card>
           ) : null}

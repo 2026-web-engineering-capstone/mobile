@@ -187,6 +187,12 @@ export function RequestDetailScreen({ requestId }: { requestId: string }) {
               />
               <Separator />
               <InfoRow label="요청 시간" value={formatDateTime(request.created_at)} />
+              {request.train_number ? (
+                <>
+                  <Separator />
+                  <InfoRow label="탑승 열차" value={request.train_number} />
+                </>
+              ) : null}
               {request.train_car_number ? (
                 <>
                   <Separator />

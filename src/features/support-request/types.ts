@@ -65,6 +65,7 @@ export type SupportRequestListItem = {
   meeting_point: MeetingPoint;
   passenger_name: string;
   assigned_staff_name: string | null;
+  train_number: string | null;
   train_car_number: string | null;
   created_at: string;
 };

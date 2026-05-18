@@ -71,12 +71,16 @@ export function updateSupportRequestStatus(
   requestId: string,
   status: SupportRequestStatus,
   options?: {
+    trainNumber?: string;
     trainCarNumber?: string;
     completionNote?: string;
   },
 ) {
   const payload = {
     status,
+    ...(options?.trainNumber !== undefined
+      ? { train_number: options.trainNumber }
+      : {}),
     ...(options?.trainCarNumber !== undefined
       ? { train_car_number: options.trainCarNumber }
       : {}),

@@ -119,14 +119,17 @@ export function useUpdateSupportRequestStatus(requestId: string) {
   return useMutation({
     mutationFn: ({
       status,
+      trainNumber,
       trainCarNumber,
       completionNote,
     }: {
       status: SupportRequestStatus;
+      trainNumber?: string;
       trainCarNumber?: string;
       completionNote?: string;
     }) =>
       updateSupportRequestStatus(requestId, status, {
+        trainNumber,
         trainCarNumber,
         completionNote,
       }),
