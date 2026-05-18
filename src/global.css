@@ -4,15 +4,99 @@
 @source '../node_modules/heroui-native/lib';
 
 @theme {
-  /* 브랜드 컬러 (라이트) */
+  /* ───────────────────────── Brand ───────────────────────── */
   --color-brand: #3681cb;
   --color-brand-soft: #759cce;
   --color-brand-surface: #f4f8fc;
   --color-brand-tint: #e8f0fa;
 
-  /* 브랜드 컬러 (다크) */
   --color-brand-dark: #6aafe0;
   --color-brand-soft-dark: #8abde6;
   --color-brand-surface-dark: #1a2332;
   --color-brand-tint-dark: #1e2d3f;
+
+  /* ───────────── Semantic status colors (light) ─────────────
+   * 교움 8가지 요청 상태 + 일반적 success/warning/danger/info
+   * WCAG AA 명도 대비 4.5:1 이상을 기본으로 함.
+   */
+  --color-status-submitted: #2563eb;       /* 접수 - 파랑 */
+  --color-status-submitted-bg: #dbeafe;
+  --color-status-assigned: #7c3aed;        /* 배정 - 보라 */
+  --color-status-assigned-bg: #ede9fe;
+  --color-status-in-progress: #f59e0b;     /* 지원 중 - 황색 */
+  --color-status-in-progress-bg: #fef3c7;
+  --color-status-boarded: #0891b2;         /* 승차 완료 - 청록 */
+  --color-status-boarded-bg: #cffafe;
+  --color-status-awaiting-dropoff: #0d9488;/* 하차 대기 - 진청록 */
+  --color-status-awaiting-dropoff-bg: #ccfbf1;
+  --color-status-completed: #16a34a;       /* 완료 - 초록 */
+  --color-status-completed-bg: #dcfce7;
+  --color-status-cancelled: #6b7280;       /* 취소 - 회색 */
+  --color-status-cancelled-bg: #f3f4f6;
+  --color-status-unavailable: #dc2626;     /* 지원 불가 - 빨강 */
+  --color-status-unavailable-bg: #fee2e2;
+
+  --color-success: #16a34a;
+  --color-success-bg: #dcfce7;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fef3c7;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-info: #2563eb;
+  --color-info-bg: #dbeafe;
+
+  /* ───────────── Semantic status colors (dark) ───────────── */
+  --color-status-submitted-dark: #93c5fd;
+  --color-status-submitted-bg-dark: #1e3a8a;
+  --color-status-assigned-dark: #c4b5fd;
+  --color-status-assigned-bg-dark: #4c1d95;
+  --color-status-in-progress-dark: #fcd34d;
+  --color-status-in-progress-bg-dark: #78350f;
+  --color-status-boarded-dark: #67e8f9;
+  --color-status-boarded-bg-dark: #164e63;
+  --color-status-awaiting-dropoff-dark: #5eead4;
+  --color-status-awaiting-dropoff-bg-dark: #134e4a;
+  --color-status-completed-dark: #86efac;
+  --color-status-completed-bg-dark: #14532d;
+  --color-status-cancelled-dark: #d1d5db;
+  --color-status-cancelled-bg-dark: #374151;
+  --color-status-unavailable-dark: #fca5a5;
+  --color-status-unavailable-bg-dark: #7f1d1d;
+
+  --color-success-dark: #86efac;
+  --color-success-bg-dark: #14532d;
+  --color-warning-dark: #fcd34d;
+  --color-warning-bg-dark: #78350f;
+  --color-danger-dark: #fca5a5;
+  --color-danger-bg-dark: #7f1d1d;
+  --color-info-dark: #93c5fd;
+  --color-info-bg-dark: #1e3a8a;
+
+  /* ───────────── Spacing scale (8pt grid) ───────────── */
+  /* 카드/리스트 row 터치 영역은 최소 44pt 보장 */
+  --spacing-tap-target: 44px;
+  --spacing-section: 32px;
+
+  /* ───────────── Typography scale ─────────────
+   * 폰트 스케일 'md' 기본값. 'lg' 토글 시 인라인 textScale로 조정.
+   */
+  --text-xxs: 11px;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+
+  /* ───────────── Motion ───────────── */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ───────────── Radius ───────────── */
+  --radius-card: 24px;
+  --radius-pill: 9999px;
+  --radius-chip: 12px;
 }
