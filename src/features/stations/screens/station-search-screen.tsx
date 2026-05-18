@@ -6,9 +6,11 @@ import { Card } from 'heroui-native/card';
 import { Chip } from 'heroui-native/chip';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EmptyView } from '@/components/ui';
 import { useStations } from '@/features/support-request/hooks/use-support-requests';
 import { useRequestDraftStore } from '@/features/support-request/store/use-request-draft-store';
 import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
+import { useDebounce } from '@/lib/hooks/use-debounce';
 import type { Station } from '@/lib/api/types';
 
 type StationSearchContext = 'origin' | 'destination';
@@ -26,8 +28,9 @@ export function StationSearchScreen() {
   const { context } = useLocalSearchParams<{ context?: string }>();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query.trim(), 200);
   const selectionContext = getSelectionContext(context);
-  const { data: stations = [] } = useStations(query || undefined);
+  const { data: stations = [] } = useStations(debouncedQuery || undefined);
   const recentStations = useStationPreferencesStore((state) => state.recentStations);
   const recordRecentStation = useStationPreferencesStore((state) => state.recordRecentStation);
   const toggleFavoriteStation = useStationPreferencesStore((state) => state.toggleFavoriteStation);
@@ -37,7 +40,9 @@ export function StationSearchScreen() {
   const setOriginStationId = useRequestDraftStore((state) => state.setOriginStationId);
   const setDestinationStationId = useRequestDraftStore((state) => state.setDestinationStationId);
 
-  const filtered = query ? stations.filter((station) => station.name.includes(query)) : stations;
+  const filtered = debouncedQuery
+    ? stations.filter((station) => station.name.includes(debouncedQuery))
+    : stations;
   const canSelectStation = selectionContext !== null;
 
   const selectStation = (station: Station) => {
@@ -145,20 +150,23 @@ export function StationSearchScreen() {
                 <View
                   key={station.id}
                   className="flex-row items-center gap-3 rounded-xl px-2 py-3"
+                  style={{ minHeight: 44 }}
                 >
                   <Pressable
                     className="flex-1 flex-row items-center gap-3"
                     disabled={!canSelectStation}
                     onPress={() => selectStation(station)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${station.name} ${station.line} 선택`}
                   >
                     <View
-                      className="h-7 w-7 items-center justify-center rounded-full"
+                      className="h-8 w-8 items-center justify-center rounded-full"
                       style={{ backgroundColor: station.line_color }}
                     >
                       <Text className="text-[10px] font-bold text-white">인</Text>
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-medium text-foreground">
+                      <Text className="text-base font-semibold text-foreground">
                         {station.name}
                       </Text>
                       <Text className="text-xs text-default-400">
@@ -167,26 +175,37 @@ export function StationSearchScreen() {
                     </View>
                   </Pressable>
                   <Pressable
-                    className={`rounded-lg px-3 py-1.5 ${favorite ? 'bg-warning/15' : 'bg-default-100'}`}
+                    className={`items-center justify-center rounded-lg px-3 ${favorite ? 'bg-warning/15' : 'bg-default-100'}`}
+                    style={{ minHeight: 44, minWidth: 64 }}
                     onPress={() => toggleFavoriteStation(station)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      favorite ? '즐겨찾기 해제' : '즐겨찾기 추가'
+                    }
+                    accessibilityState={{ selected: favorite }}
                   >
                     <Text
                       className={`text-xs font-medium ${favorite ? 'text-warning' : 'text-default-500'}`}
                     >
-                      {favorite ? '저장됨' : '즐겨찾기'}
+                      {favorite ? '★ 저장됨' : '☆ 즐겨찾기'}
                     </Text>
                   </Pressable>
                 </View>
               );
             })}
             {filtered.length === 0 ? (
-              <Card className="rounded-2xl">
-                <Card.Body className="items-center p-6">
-                  <Text className="text-sm text-default-400">
-                    '{query}'에 해당하는 역이 없습니다
-                  </Text>
-                </Card.Body>
-              </Card>
+              <EmptyView
+                title={
+                  debouncedQuery
+                    ? `'${debouncedQuery}'에 해당하는 역이 없습니다`
+                    : '표시할 역이 없습니다'
+                }
+                description={
+                  debouncedQuery
+                    ? '다른 키워드로 다시 검색해 주세요.'
+                    : '잠시 후 다시 시도해 주세요.'
+                }
+              />
             ) : null}
           </View>
         </View>
