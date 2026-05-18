@@ -1,6 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
+import * as Notifications from 'expo-notifications';
 import { getSupportRequestsWebSocketUrl } from '@/lib/api/client';
 import { queryKeys } from '@/lib/query/query-keys';
+import {
+  SUPPORT_REQUEST_STATUS_GUIDES,
+  SUPPORT_REQUEST_STATUS_LABELS,
+  type SupportRequestDetail,
+  type SupportRequestStatus,
+} from '@/features/support-request/types';
 
 type SupportRequestUpdatedMessage = {
   type: 'support_request.updated';
@@ -34,16 +41,52 @@ function isSupportRequestUpdatedMessage(
   );
 }
 
+function getStatusToastBody(status: SupportRequestStatus): string {
+  return SUPPORT_REQUEST_STATUS_GUIDES[status] ?? '요청 상태가 갱신되었습니다.';
+}
+
+async function scheduleStatusChangeNotification(
+  request: SupportRequestDetail,
+): Promise<void> {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `상태: ${SUPPORT_REQUEST_STATUS_LABELS[request.status]}`,
+        body: getStatusToastBody(request.status),
+        data: { requestId: request.id, status: request.status },
+      },
+      trigger: null,
+    });
+  } catch {
+    // expo-notifications가 사용 불가한 환경(예: web)일 수 있다. 사용자에게는
+    // WebSocket 갱신으로 화면이 이미 업데이트되므로 조용히 넘긴다.
+  }
+}
+
 async function handleRealtimeMessage(
   queryClient: QueryClient,
   message: SupportRequestRealtimeMessage,
-) {
+): Promise<void> {
+  const detailKey = queryKeys.supportRequests.detail(message.requestId);
+  const previous =
+    queryClient.getQueryData<SupportRequestDetail>(detailKey) ?? null;
+  const previousStatus = previous?.status ?? null;
+
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all }),
-    queryClient.invalidateQueries({
-      queryKey: queryKeys.supportRequests.detail(message.requestId),
-    }),
+    queryClient.refetchQueries({ queryKey: detailKey, exact: true }),
   ]);
+
+  if (previousStatus === null) {
+    return;
+  }
+
+  const next = queryClient.getQueryData<SupportRequestDetail>(detailKey);
+  if (!next || next.status === previousStatus) {
+    return;
+  }
+
+  await scheduleStatusChangeNotification(next);
 }
 
 export function connectSupportRequestsWebSocket(
