@@ -98,6 +98,9 @@ export function AccessibilityScreen() {
                         : 'border-default-200 bg-background'
                     }`}
                     onPress={() => setThemePreference(option.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${option.label} 테마 선택`}
                   >
                     <Text className="text-2xl">{option.icon}</Text>
                     <Text

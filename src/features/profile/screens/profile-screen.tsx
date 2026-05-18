@@ -44,8 +44,11 @@ const ROLE_LABELS = {
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { role, signOut } = useAuth();
+  const { role, user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
+  const displayName = user?.name ?? '교움 사용자';
+  const displayEmail = user?.email ?? 'demo@gyoum.kr';
+  const avatarInitial = displayName.slice(0, 1);
 
   return (
     <View className="flex-1 bg-background">
@@ -62,13 +65,22 @@ export function ProfileScreen() {
           <Card className="rounded-2xl bg-brand-surface dark:bg-brand-surface-dark">
             <Card.Body className="flex-row items-center gap-4 p-5">
               <View className="h-16 w-16 items-center justify-center rounded-full bg-brand dark:bg-brand-dark">
-                <Text className="text-2xl font-bold text-white">김</Text>
+                <Text className="text-2xl font-bold text-white">
+                  {avatarInitial}
+                </Text>
               </View>
               <View className="flex-1 gap-1">
-                <Text className="text-xl font-bold text-foreground">김교움</Text>
-                <Text className="text-sm text-default-500">
-                  {ROLE_LABELS[role]} · demo@gyoum.kr
+                <Text className="text-xl font-bold text-foreground">
+                  {displayName}
                 </Text>
+                <Text className="text-sm text-default-500">
+                  {ROLE_LABELS[role]} · {displayEmail}
+                </Text>
+                {user?.station_id ? (
+                  <Text className="text-xs text-default-400">
+                    소속 역: {user.station_id}
+                  </Text>
+                ) : null}
               </View>
             </Card.Body>
           </Card>
