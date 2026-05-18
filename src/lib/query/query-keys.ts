@@ -12,4 +12,10 @@ export const queryKeys = {
     activeDetail: (requestId: string) =>
       ['support-requests', requestId, 'active'] as const,
   },
+  transit: {
+    arrivals: (stationName: string) =>
+      ['transit', 'arrivals', stationName] as const,
+    facilities: (stationName: string) =>
+      ['transit', 'facilities', stationName] as const,
+  },
 };

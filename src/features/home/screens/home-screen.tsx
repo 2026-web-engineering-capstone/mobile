@@ -5,14 +5,14 @@ import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusChip } from '@/components/ui';
-import { ArrivalCard } from '@/features/home/components/arrival-card';
-import { FacilitiesGrid } from '@/features/home/components/facilities-grid';
 import { Header } from '@/features/home/components/header';
 import { MapSection } from '@/features/home/components/map-section';
 import { StationLineIcon } from '@/features/home/components/station-line-icon';
 import { StationSelector } from '@/features/home/components/station-selector';
 import type { StationInfo } from '@/features/home/types';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
+import { LiveArrivalSection } from '@/features/transit/components/live-arrival-section';
+import { LiveFacilitiesSection } from '@/features/transit/components/live-facilities-section';
 import {
   SUPPORT_REQUEST_STATUS_GUIDES,
   TERMINAL_REQUEST_STATUSES,
@@ -33,13 +33,6 @@ const STATION: StationInfo = {
     },
   },
 };
-
-const FACILITIES = [
-  { label: '수유실', available: true },
-  { label: '장애인화장실', available: true },
-  { label: '엘리베이터', available: true },
-  { label: '휠체어 리프트', available: false },
-];
 
 export function HomeScreen() {
   const router = useRouter();
@@ -125,39 +118,9 @@ export function HomeScreen() {
             previousStation={STATION.previous}
           />
 
-          <View className="gap-4">
-            <Text className="text-xl font-bold tracking-tight text-foreground">
-              도착 정보
-            </Text>
-            <View className="flex-row gap-3">
-              <ArrivalCard
-                title="계양 방면"
-                rows={[
-                  { destination: '계양', eta: '5분' },
-                  { destination: '계양', eta: '12분' },
-                ]}
-                etaColor={STATION.line.colors.soft}
-              />
-              <ArrivalCard
-                title="송도달빛축제공원 방면"
-                rows={[
-                  { destination: '송도달빛축제공원', eta: '5분' },
-                  { destination: '송도달빛축제공원', eta: '12분' },
-                ]}
-                etaColor={STATION.line.colors.soft}
-              />
-            </View>
-            <Text className="text-xs text-default-400">
-              ※ 현재 표시는 데모 데이터입니다. 실시간 도착 정보 연동은 곧 적용됩니다.
-            </Text>
-          </View>
+          <LiveArrivalSection stationName={STATION.name} />
 
-          <View className="gap-4">
-            <Text className="text-xl font-bold tracking-tight text-foreground">
-              교통약자 시설
-            </Text>
-            <FacilitiesGrid facilities={FACILITIES} />
-          </View>
+          <LiveFacilitiesSection stationName={STATION.name} />
 
           {/* 주요 CTA */}
           <View className="mt-2 gap-2">
