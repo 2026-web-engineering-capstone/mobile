@@ -3,7 +3,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
-import { Chip } from 'heroui-native/chip';
+import { ErrorView, LoadingView, StatusChip } from '@/components/ui';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -40,7 +40,6 @@ import {
   CANCELLABLE_REQUEST_STATUSES,
   CANCEL_REASON_LABELS,
   getSupportRequestStatusGuide,
-  STATUS_CHIP_COLORS,
   STAFF_ORIGIN_PROCESSING_STATUSES,
   SUPPORT_REQUEST_FLOW,
   SUPPORT_REQUEST_STATUS_GUIDES,
@@ -348,18 +347,32 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text className="text-sm text-default-500">지원 상태를 불러오는 중입니다.</Text>
+      <View className="flex-1 bg-background">
+        <StatusBar style="auto" />
+        <View
+          className="flex-1 items-center justify-center px-6"
+          style={{ paddingTop: insets.top }}
+        >
+          <LoadingView label="지원 상태를 불러오고 있어요" />
+        </View>
       </View>
     );
   }
 
   if (error || !request) {
     return (
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text className="text-center text-sm text-danger">
-          지원 상태를 불러오지 못했습니다.
-        </Text>
+      <View className="flex-1 bg-background">
+        <StatusBar style="auto" />
+        <View
+          className="flex-1 items-center justify-center px-6"
+          style={{ paddingTop: insets.top }}
+        >
+          <ErrorView
+            title="지원 상태를 불러오지 못했어요"
+            message="잠시 후 다시 시도해 주세요."
+            onRetry={() => router.back()}
+          />
+        </View>
       </View>
     );
   }
@@ -479,13 +492,7 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
               </Text>
               <Text className="text-xs text-default-400">{request.id}</Text>
             </View>
-            <Chip
-              variant="soft"
-              color={STATUS_CHIP_COLORS[request.status]}
-              size="sm"
-            >
-              {SUPPORT_REQUEST_STATUS_LABELS[request.status]}
-            </Chip>
+            <StatusChip status={request.status} />
           </View>
 
           <Card className="rounded-2xl bg-brand-surface dark:bg-brand-surface-dark">
