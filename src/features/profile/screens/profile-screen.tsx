@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
+import { Chip } from 'heroui-native/chip';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
@@ -44,7 +45,7 @@ const ROLE_LABELS = {
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { role, signOut } = useAuth();
+  const { role, signOut, switchRole } = useAuth();
   const insets = useSafeAreaInsets();
 
   return (
@@ -69,6 +70,31 @@ export function ProfileScreen() {
                 <Text className="text-sm text-default-500">
                   {ROLE_LABELS[role]} · demo@gyoum.kr
                 </Text>
+              </View>
+            </Card.Body>
+          </Card>
+
+          <Card className="rounded-2xl">
+            <Card.Body className="gap-3 p-4">
+              <Text className="text-xs font-semibold tracking-wider text-default-400">
+                데모 역할 전환
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {(['passenger', 'staff'] as const).map((item) => {
+                  const selected = role === item;
+                  return (
+                    <Chip
+                      key={item}
+                      variant={selected ? 'primary' : 'soft'}
+                      className={selected ? 'bg-brand dark:bg-brand-dark' : ''}
+                      onPress={() => {
+                        void switchRole(item);
+                      }}
+                    >
+                      {ROLE_LABELS[item]}
+                    </Chip>
+                  );
+                })}
               </View>
             </Card.Body>
           </Card>
@@ -113,9 +139,9 @@ export function ProfileScreen() {
               </View>
               <View className="flex-row items-center justify-between py-1">
                 <Text className="text-sm text-default-500">환경</Text>
-                <Text className="text-sm text-default-400">
-                  데모 (API 미연동)
-                </Text>
+                  <Text className="text-sm text-default-400">
+                  데모 (API 연동)
+                  </Text>
               </View>
             </Card.Body>
           </Card>
@@ -124,7 +150,9 @@ export function ProfileScreen() {
             size="lg"
             variant="danger-soft"
             className="rounded-xl"
-            onPress={signOut}
+            onPress={() => {
+              void signOut();
+            }}
           >
             로그아웃
           </Button>

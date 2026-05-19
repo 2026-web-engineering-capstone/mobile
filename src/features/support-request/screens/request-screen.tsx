@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useMutation } from '@tanstack/react-query';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
 import { Chip } from 'heroui-native/chip';
@@ -16,25 +17,37 @@ import type {
   MeetingPoint,
   SupportType,
 } from '@/features/support-request/store/use-request-draft-store';
+import { createSupportRequest } from '@/features/support-request/api';
+import type { SupportRequestDetail } from '@/features/support-request/types';
+import { queryClient } from '@/lib/query/query-client';
+import { queryKeys } from '@/lib/query/query-keys';
 
 const INCHEON_LINE_STATIONS = [
-  '계양역',
-  '귤현역',
-  '박촌역',
-  '임학역',
-  '작전역',
-  '갈산역',
-  '지식정보단지역',
-  '인천대입구역',
-  '센트럴파크역',
-  '국제업무지구역',
-  '송도달빛축제공원역',
+  { id: 'STN-GY', name: '계양역' },
+  { id: 'STN-GH', name: '귤현역' },
+  { id: 'STN-BC', name: '박촌역' },
+  { id: 'STN-IH', name: '임학역' },
+  { id: 'STN-JJ', name: '작전역' },
+  { id: 'STN-GS', name: '갈산역' },
+  { id: 'STN-JI', name: '지식정보단지역' },
+  { id: 'STN-ICU', name: '인천대입구역' },
+  { id: 'STN-CP', name: '센트럴파크역' },
+  { id: 'STN-IBD', name: '국제업무지구역' },
+  { id: 'STN-SD', name: '송도달빛축제공원역' },
+  { id: 'STN-HSU', name: '한성대입구역' },
+  { id: 'STN-HYE', name: '혜화역' },
+  { id: 'STN-SSW', name: '성신여대입구역' },
 ];
+
+const STATION_ID_BY_NAME = Object.fromEntries(
+  INCHEON_LINE_STATIONS.map((station) => [station.name, station.id]),
+);
 
 export function RequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [submitted, setSubmitted] = useState(false);
+  const [submittedRequest, setSubmittedRequest] =
+    useState<SupportRequestDetail | null>(null);
 
   const {
     destinationStation,
@@ -50,16 +63,37 @@ export function RequestScreen() {
     reset,
   } = useRequestDraftStore();
 
+  const createRequestMutation = useMutation({
+    mutationFn: () =>
+      createSupportRequest({
+        origin_station_id: STATION_ID_BY_NAME[originStation],
+        destination_station_id: STATION_ID_BY_NAME[destinationStation],
+        meeting_point: meetingPoint,
+        notes,
+        support_types: supportTypes,
+      }),
+    onSuccess: async (request) => {
+      setSubmittedRequest(request);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.supportRequests.all,
+      });
+    },
+  });
+
   const handleSubmit = () => {
-    setSubmitted(true);
+    if (!STATION_ID_BY_NAME[originStation] || !STATION_ID_BY_NAME[destinationStation]) {
+      return;
+    }
+
+    createRequestMutation.mutate();
   };
 
   const handleNewRequest = () => {
     reset();
-    setSubmitted(false);
+    setSubmittedRequest(null);
   };
 
-  if (submitted) {
+  if (submittedRequest) {
     return (
       <View className="flex-1 bg-background">
         <StatusBar style="auto" />
@@ -75,7 +109,8 @@ export function RequestScreen() {
               지원 요청이 접수되었습니다
             </Text>
             <Text className="text-center text-sm leading-5 text-default-500">
-              {originStation} → {destinationStation}
+              {submittedRequest.origin_station_name} →{' '}
+              {submittedRequest.destination_station_name}
               {'\n'}역무원이 배정되면 알림으로 안내드릴게요
             </Text>
           </View>
@@ -84,7 +119,9 @@ export function RequestScreen() {
               size="lg"
               className="rounded-xl bg-brand dark:bg-brand-dark"
               onPress={() =>
-                router.push('/(app)/support/status/REQ-2026-003')
+                router.push(
+                  `/(app)/support/status/${submittedRequest.id}` as never,
+                )
               }
             >
               요청 상태 확인
@@ -140,22 +177,31 @@ export function RequestScreen() {
                     className="-mx-1"
                     contentContainerClassName="gap-2 px-1"
                   >
-                    {INCHEON_LINE_STATIONS.map((station) => (
-                      <Chip
-                        key={station}
-                        variant={
-                          originStation === station ? 'primary' : 'soft'
-                        }
-                        className={
-                          originStation === station
-                            ? 'bg-brand dark:bg-brand-dark'
-                            : ''
-                        }
-                        onPress={() => setOriginStation(station)}
-                      >
-                        {station.replace('역', '')}
-                      </Chip>
-                    ))}
+                    {INCHEON_LINE_STATIONS.map((station) => {
+                      const isSelected = originStation === station.name;
+
+                      return (
+                        <Pressable
+                          key={station.id}
+                          className={`rounded-full px-4 py-2 ${
+                            isSelected
+                              ? 'bg-brand dark:bg-brand-dark'
+                              : 'bg-default-100'
+                          }`}
+                          onPress={() => setOriginStation(station.name)}
+                        >
+                          <Text
+                            className={`text-sm ${
+                              isSelected
+                                ? 'font-semibold text-white'
+                                : 'text-default-600'
+                            }`}
+                          >
+                            {station.name.replace('역', '')}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
                   </ScrollView>
                 </View>
                 <Separator />
@@ -169,22 +215,31 @@ export function RequestScreen() {
                     className="-mx-1"
                     contentContainerClassName="gap-2 px-1"
                   >
-                    {INCHEON_LINE_STATIONS.map((station) => (
-                      <Chip
-                        key={station}
-                        variant={
-                          destinationStation === station ? 'primary' : 'soft'
-                        }
-                        className={
-                          destinationStation === station
-                            ? 'bg-brand dark:bg-brand-dark'
-                            : ''
-                        }
-                        onPress={() => setDestinationStation(station)}
-                      >
-                        {station.replace('역', '')}
-                      </Chip>
-                    ))}
+                    {INCHEON_LINE_STATIONS.map((station) => {
+                      const isSelected = destinationStation === station.name;
+
+                      return (
+                        <Pressable
+                          key={station.id}
+                          className={`rounded-full px-4 py-2 ${
+                            isSelected
+                              ? 'bg-brand dark:bg-brand-dark'
+                              : 'bg-default-100'
+                          }`}
+                          onPress={() => setDestinationStation(station.name)}
+                        >
+                          <Text
+                            className={`text-sm ${
+                              isSelected
+                                ? 'font-semibold text-white'
+                                : 'text-default-600'
+                            }`}
+                          >
+                            {station.name.replace('역', '')}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
                   </ScrollView>
                 </View>
               </View>
@@ -288,6 +343,11 @@ export function RequestScreen() {
                   메모: {notes}
                 </Text>
               ) : null}
+              {createRequestMutation.isError ? (
+                <Text className="text-xs text-danger">
+                  지원 요청 전송에 실패했습니다. 잠시 후 다시 시도해주세요.
+                </Text>
+              ) : null}
             </Card.Body>
           </Card>
         </View>
@@ -301,10 +361,15 @@ export function RequestScreen() {
         <Button
           size="lg"
           className="rounded-xl bg-brand dark:bg-brand-dark"
-          isDisabled={!originStation || !destinationStation || supportTypes.length === 0}
+          isDisabled={
+            !originStation ||
+            !destinationStation ||
+            supportTypes.length === 0 ||
+            createRequestMutation.isPending
+          }
           onPress={handleSubmit}
         >
-          지원 요청하기
+          {createRequestMutation.isPending ? '요청 전송 중...' : '지원 요청하기'}
         </Button>
       </View>
     </View>

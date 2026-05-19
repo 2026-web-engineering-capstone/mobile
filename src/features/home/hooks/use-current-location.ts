@@ -12,7 +12,7 @@ type UseCurrentLocationResult = {
   isLoading: boolean;
 };
 
-export function useCurrentLocation(): UseCurrentLocationResult {
+export function useCurrentLocation(enabled = true): UseCurrentLocationResult {
   const [currentLocation, setCurrentLocation] = useState<Coordinate | null>(
     null,
   );
@@ -20,6 +20,13 @@ export function useCurrentLocation(): UseCurrentLocationResult {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!enabled) {
+      setCurrentLocation(null);
+      setErrorMessage(null);
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
     let subscription: Location.LocationSubscription | null = null;
 
@@ -96,7 +103,7 @@ export function useCurrentLocation(): UseCurrentLocationResult {
       isMounted = false;
       subscription?.remove();
     };
-  }, []);
+  }, [enabled]);
 
   return {
     currentLocation,

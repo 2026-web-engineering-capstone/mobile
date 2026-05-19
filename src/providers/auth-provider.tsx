@@ -5,29 +5,50 @@ import {
   useMemo,
   useState,
 } from 'react';
-
-type Role = 'passenger' | 'staff' | 'driver' | 'admin';
+import { signInWithRole, signOutSession } from '@/features/auth/api';
+import type { Role } from '@/features/auth/types';
 
 type AuthContextValue = {
   isAuthenticated: boolean;
+  isHydrating: boolean;
   role: Role;
-  signIn: () => void;
-  signOut: () => void;
+  signIn: (nextRole?: Role) => Promise<void>;
+  signOut: () => Promise<void>;
+  switchRole: (nextRole: Role) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
+  const [role, setRole] = useState<Role>('passenger');
 
   const value = useMemo<AuthContextValue>(
     () => ({
       isAuthenticated,
-      role: 'passenger',
-      signIn: () => setIsAuthenticated(true),
-      signOut: () => setIsAuthenticated(false),
+      isHydrating,
+      role,
+      signIn: async (nextRole = 'passenger') => {
+        const sessionUser = await signInWithRole(nextRole);
+        setRole(sessionUser.role);
+        setIsAuthenticated(true);
+        setIsHydrating(false);
+      },
+      signOut: async () => {
+        await signOutSession();
+        setRole('passenger');
+        setIsAuthenticated(false);
+        setIsHydrating(false);
+      },
+      switchRole: async (nextRole) => {
+        const sessionUser = await signInWithRole(nextRole);
+        setRole(sessionUser.role);
+        setIsAuthenticated(true);
+        setIsHydrating(false);
+      },
     }),
-    [isAuthenticated],
+    [isAuthenticated, isHydrating, role],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

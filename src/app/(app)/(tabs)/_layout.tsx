@@ -2,11 +2,14 @@ import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/providers/auth-provider';
 
 function TabsLayout() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { role } = useAuth();
+  const isStaff = role === 'staff';
 
   return (
     <Tabs
@@ -41,10 +44,18 @@ function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: '홈',
+          title: isStaff ? '대시보드' : '홈',
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
-              name={focused ? 'home' : 'home-outline'}
+              name={
+                isStaff
+                  ? focused
+                    ? 'speedometer'
+                    : 'speedometer-outline'
+                  : focused
+                    ? 'home'
+                    : 'home-outline'
+              }
               size={focused ? size + 1 : size}
               color={color}
             />
@@ -54,10 +65,18 @@ function TabsLayout() {
       <Tabs.Screen
         name="request"
         options={{
-          title: '지원 요청',
+          title: isStaff ? '요청함' : '지원 요청',
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
-              name={focused ? 'train' : 'train-outline'}
+              name={
+                isStaff
+                  ? focused
+                    ? 'list'
+                    : 'list-outline'
+                  : focused
+                    ? 'train'
+                    : 'train-outline'
+              }
               size={focused ? size + 1 : size}
               color={color}
             />
@@ -67,7 +86,7 @@ function TabsLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: '이용 내역',
+          title: isStaff ? '처리 내역' : '이용 내역',
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
               name={focused ? 'time' : 'time-outline'}

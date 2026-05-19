@@ -38,8 +38,8 @@ type RequestDraftState = {
 };
 
 const initialState = {
-  originStation: '인천대입구역',
-  destinationStation: '센트럴파크역',
+  originStation: '한성대입구역',
+  destinationStation: '혜화역',
   meetingPoint: 'elevator' as MeetingPoint,
   notes: '',
   supportTypes: ['wheelchair'] as SupportType[],

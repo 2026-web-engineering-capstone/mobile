@@ -1,3 +1,8 @@
+import {
+  AndroidConfig,
+  type ConfigPlugin,
+  withAndroidManifest,
+} from '@expo/config-plugins';
 import type { ExpoConfig } from 'expo/config';
 
 function resolveNaverMapClientId() {
@@ -21,6 +26,39 @@ function resolveNaverMapClientId() {
 }
 
 const naverMapClientId = resolveNaverMapClientId();
+
+const withResolvedNaverMapAndroidClientId: ConfigPlugin = (config) =>
+  withAndroidManifest(config, (config) => {
+    const mainApplication =
+      AndroidConfig.Manifest.getMainApplicationOrThrow(config.modResults);
+    const metadataKeys = [
+      'com.naver.maps.map.CLIENT_ID',
+      'com.naver.maps.map.NCP_KEY_ID',
+    ];
+
+    if (!mainApplication['meta-data']) {
+      mainApplication['meta-data'] = [];
+    }
+
+    metadataKeys.forEach((name) => {
+      const existingMetadata = mainApplication['meta-data']?.find(
+        (item) => item.$['android:name'] === name,
+      );
+
+      if (existingMetadata) {
+        existingMetadata.$['android:value'] = naverMapClientId;
+        return;
+      }
+
+      AndroidConfig.Manifest.addMetaDataItemToMainApplication(
+        mainApplication,
+        name,
+        naverMapClientId,
+      );
+    });
+
+    return config;
+  });
 
 const config: ExpoConfig = {
   name: '교움',
@@ -62,6 +100,7 @@ const config: ExpoConfig = {
         client_id: naverMapClientId,
       },
     ],
+    withResolvedNaverMapAndroidClientId as never,
     [
       'expo-build-properties',
       {

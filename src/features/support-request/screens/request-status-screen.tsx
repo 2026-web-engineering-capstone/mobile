@@ -1,56 +1,125 @@
 import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
 import { Chip } from 'heroui-native/chip';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { cancelSupportRequest, getSupportRequest } from '@/features/support-request/api';
+import {
+  MEETING_POINT_LABELS,
+  SUPPORT_TYPE_LABELS,
+} from '@/features/support-request/store/use-request-draft-store';
+import {
+  STATUS_COLOR,
+  STATUS_LABELS,
+  TERMINAL_STATUSES,
+  type SupportRequestDetail,
+  type SupportRequestStatus,
+} from '@/features/support-request/types';
+import { useSupportRequestsRealtime } from '@/features/support-request/hooks/use-support-requests-realtime';
+import { queryClient } from '@/lib/query/query-client';
+import { queryKeys } from '@/lib/query/query-keys';
+import { formatKoreanTime } from '@/lib/date/format';
 
 type TimelineStep = {
+  status: SupportRequestStatus;
   label: string;
-  time: string | null;
   guide: string;
 };
 
-const DUMMY_TIMELINE: TimelineStep[] = [
+const TIMELINE_STEPS: TimelineStep[] = [
   {
+    status: 'submitted',
     label: '접수 완료',
-    time: '14:02',
     guide: '요청이 정상적으로 접수되었습니다.',
   },
   {
+    status: 'assigned',
     label: '역무원 배정',
-    time: '14:03',
-    guide: '김민수 역무원이 배정되었습니다.',
+    guide: '담당 역무원이 요청을 확인하고 있습니다.',
   },
   {
+    status: 'in_progress',
     label: '지원 중',
-    time: '14:07',
     guide: '역무원이 만남 장소로 이동하고 있습니다.',
   },
   {
+    status: 'boarded',
     label: '승차 완료',
-    time: null,
-    guide: '승차 후 열차 칸 번호가 공유됩니다.',
+    guide: '승차 후 열차 정보가 공유됩니다.',
   },
   {
+    status: 'awaiting_dropoff',
     label: '하차 대기',
-    time: null,
-    guide: '하차 역 역무원이 마중 준비합니다.',
+    guide: '하차 역 역무원이 마중을 준비합니다.',
   },
   {
+    status: 'completed',
     label: '지원 완료',
-    time: null,
     guide: '안전하게 하차가 완료됩니다.',
   },
 ];
 
-const CURRENT_STEP = 2;
+function getCurrentStepIndex(status: SupportRequestStatus) {
+  if (status === 'cancelled' || status === 'unavailable') {
+    return TIMELINE_STEPS.findIndex((step) => step.status === 'submitted');
+  }
+
+  return Math.max(
+    TIMELINE_STEPS.findIndex((step) => step.status === status),
+    0,
+  );
+}
+
+function getEventForStatus(request: SupportRequestDetail, status: SupportRequestStatus) {
+  return [...request.events]
+    .reverse()
+    .find((event) => event.to_status === status);
+}
+
+function getStepTime(request: SupportRequestDetail, status: SupportRequestStatus) {
+  const event = getEventForStatus(request, status);
+  const value = event?.created_at ?? (status === 'submitted' ? request.created_at : null);
+
+  return value ? formatKoreanTime(value) : null;
+}
 
 export function RequestStatusScreen({ requestId }: { requestId: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  useSupportRequestsRealtime();
+
+  const requestQuery = useQuery({
+    queryKey: queryKeys.supportRequests.detail(requestId),
+    queryFn: () => getSupportRequest(requestId),
+    refetchInterval: 2000,
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => cancelSupportRequest(requestId, 'no_longer_needed'),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.supportRequests.detail(requestId),
+      });
+    },
+  });
+
+  if (requestQuery.isLoading || !requestQuery.data) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <Text className="text-sm text-default-400">지원 상태를 불러오는 중...</Text>
+      </View>
+    );
+  }
+
+  const request = requestQuery.data;
+  const currentStep = getCurrentStepIndex(request.status);
+  const latestEvent = request.events[request.events.length - 1];
+  const isTerminal = TERMINAL_STATUSES.includes(request.status);
 
   return (
     <View className="flex-1 bg-background">
@@ -68,37 +137,42 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
               <Text className="text-2xl font-bold tracking-tight text-foreground">
                 지원 상태
               </Text>
-              <Text className="text-xs text-default-400">{requestId}</Text>
+              <Text className="text-xs text-default-400">{request.id}</Text>
             </View>
-            <Chip variant="soft" color="accent" size="sm">
-              {DUMMY_TIMELINE[CURRENT_STEP].label}
+            <Chip variant="soft" color={STATUS_COLOR[request.status]} size="sm">
+              {STATUS_LABELS[request.status]}
             </Chip>
           </View>
 
-          {/* 요청 요약 카드 */}
           <Card className="rounded-2xl bg-brand-surface dark:bg-brand-surface-dark">
             <Card.Body className="gap-2 p-4">
               <Text className="text-base font-semibold text-foreground">
-                인천대입구역 → 센트럴파크역
+                {request.origin_station_name} → {request.destination_station_name}
               </Text>
               <Text className="text-sm text-default-500">
-                휠체어 발판 · 엘리베이터 앞 만남
+                {request.support_types
+                  .map((supportType) => SUPPORT_TYPE_LABELS[supportType])
+                  .join(' · ')}
+                {' · '}
+                {MEETING_POINT_LABELS[request.meeting_point]} 만남
               </Text>
               <Text className="text-xs text-default-400">
-                담당 역무원: 김민수
+                담당 역무원: {request.assigned_staff_name ?? '배정 대기'}
               </Text>
             </Card.Body>
           </Card>
 
-          {/* 타임라인 */}
-          <View className="gap-0">
-            {DUMMY_TIMELINE.map((step, index) => {
-              const isDone = index <= CURRENT_STEP;
-              const isCurrent = index === CURRENT_STEP;
+          <View>
+            {TIMELINE_STEPS.map((step, index) => {
+              const event = getEventForStatus(request, step.status);
+              const isDone = index <= currentStep && request.status !== 'cancelled';
+              const isCurrent =
+                step.status === request.status ||
+                (request.status === 'unavailable' && index === currentStep);
+              const stepTime = getStepTime(request, step.status);
 
               return (
-                <View key={step.label} className="flex-row">
-                  {/* 좌측 타임라인 바 */}
+                <View key={step.status} className="flex-row">
                   <View className="mr-4 w-6 items-center">
                     <View
                       className={`h-6 w-6 items-center justify-center rounded-full ${
@@ -109,7 +183,7 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
                             : 'border-2 border-default-200 bg-background'
                       }`}
                     >
-                      {isDone ? (
+                      {isDone || isCurrent ? (
                         <Text className="text-xs font-bold text-white">
                           {isCurrent ? '●' : '✓'}
                         </Text>
@@ -119,15 +193,16 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
                         </Text>
                       )}
                     </View>
-                    {index < DUMMY_TIMELINE.length - 1 ? (
+                    {index < TIMELINE_STEPS.length - 1 ? (
                       <View
-                        className={`w-0.5 flex-1 ${isDone ? 'bg-brand-soft dark:bg-brand-soft-dark' : 'bg-default-200'}`}
+                        className={`w-0.5 flex-1 ${
+                          isDone ? 'bg-brand-soft dark:bg-brand-soft-dark' : 'bg-default-200'
+                        }`}
                         style={{ minHeight: 40 }}
                       />
                     ) : null}
                   </View>
 
-                  {/* 우측 콘텐츠 */}
                   <View
                     className={`mb-4 flex-1 rounded-xl px-4 py-3 ${
                       isCurrent ? 'bg-brand-tint dark:bg-brand-tint-dark' : 'bg-default-50'
@@ -136,23 +211,21 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
                     <View className="flex-row items-center justify-between">
                       <Text
                         className={`text-sm font-semibold ${
-                          isDone ? 'text-foreground' : 'text-default-300'
+                          isDone || isCurrent ? 'text-foreground' : 'text-default-300'
                         }`}
                       >
                         {step.label}
                       </Text>
-                      {step.time ? (
-                        <Text className="text-xs text-default-400">
-                          {step.time}
-                        </Text>
+                      {stepTime ? (
+                        <Text className="text-xs text-default-400">{stepTime}</Text>
                       ) : null}
                     </View>
                     <Text
                       className={`mt-1 text-xs leading-4 ${
-                        isDone ? 'text-default-500' : 'text-default-300'
+                        isDone || isCurrent ? 'text-default-500' : 'text-default-300'
                       }`}
                     >
-                      {step.guide}
+                      {event?.message ?? step.guide}
                     </Text>
                   </View>
                 </View>
@@ -162,15 +235,13 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
 
           <Separator />
 
-          {/* 안내 메시지 */}
           <Card className="rounded-2xl">
             <Card.Body className="gap-2 p-4">
               <Text className="text-sm font-semibold text-foreground">
                 다음 안내
               </Text>
               <Text className="text-sm leading-5 text-default-500">
-                역무원이 엘리베이터 앞에서 만남을 준비하고 있습니다.{'\n'}잠시만
-                기다려주세요.
+                {latestEvent?.message ?? '요청 진행 상황이 여기에 표시됩니다.'}
               </Text>
             </Card.Body>
           </Card>
@@ -185,16 +256,17 @@ export function RequestStatusScreen({ requestId }: { requestId: string }) {
           size="lg"
           variant="danger-soft"
           className="flex-1 rounded-xl"
-          onPress={() => router.back()}
+          isDisabled={isTerminal || cancelMutation.isPending}
+          onPress={() => cancelMutation.mutate()}
         >
-          요청 취소
+          {cancelMutation.isPending ? '취소 중...' : '요청 취소'}
         </Button>
         <Button
           size="lg"
           className="flex-1 rounded-xl bg-brand dark:bg-brand-dark"
-          onPress={() => router.back()}
+          onPress={() => router.push(`/(app)/support/${request.id}` as never)}
         >
-          확인
+          상세 보기
         </Button>
       </View>
     </View>

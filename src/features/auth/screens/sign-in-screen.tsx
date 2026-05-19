@@ -1,11 +1,18 @@
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Button } from 'heroui-native/button';
 import { Card } from 'heroui-native/card';
+import { Chip } from 'heroui-native/chip';
 import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
+
+const ROLE_OPTIONS = [
+  { key: 'passenger', label: '교통약자 사용자' },
+  { key: 'staff', label: '역무원/승무원' },
+] as const;
 
 const FEATURES = [
   { icon: '🚇', title: '빠른 지원 요청', desc: '출발역·도착역만 선택하면 끝' },
@@ -17,10 +24,26 @@ export function SignInScreen() {
   const router = useRouter();
   const { signIn } = useAuth();
   const insets = useSafeAreaInsets();
+  const [isSubmittingRole, setIsSubmittingRole] = useState<
+    'passenger' | 'staff' | null
+  >(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSignIn = () => {
-    signIn();
-    router.replace('/(app)/(tabs)');
+  const handleSignIn = async (role: 'passenger' | 'staff') => {
+    setIsSubmittingRole(role);
+    setErrorMessage(null);
+    try {
+      await signIn(role);
+      router.replace('/(app)/(tabs)' as never);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : '로그인 연결에 실패했습니다.',
+      );
+    } finally {
+      setIsSubmittingRole(null);
+    }
   };
 
   return (
@@ -48,15 +71,28 @@ export function SignInScreen() {
           </View>
         </View>
 
-        <View className="gap-5">
-          <Card className="rounded-2xl bg-default-50">
-            <Card.Body className="gap-3 p-4">
-              {FEATURES.map((f, i) => (
-                <View key={f.title}>
-                  {i > 0 ? <Separator /> : null}
-                  <View className="flex-row items-center gap-3">
-                    <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-tint dark:bg-brand-tint-dark">
-                      <Text className="text-base">{f.icon}</Text>
+          <View className="gap-5">
+            <Card className="rounded-2xl bg-default-50">
+              <Card.Body className="gap-3 p-4">
+                <View className="gap-2">
+                  <Text className="text-xs font-semibold tracking-wider text-default-400">
+                    데모 역할 선택
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {ROLE_OPTIONS.map((role) => (
+                      <Chip key={role.key} variant="soft">
+                        {role.label}
+                      </Chip>
+                    ))}
+                  </View>
+                </View>
+                <Separator />
+                {FEATURES.map((f, i) => (
+                  <View key={f.title}>
+                    {i > 0 ? <Separator /> : null}
+                    <View className="flex-row items-center gap-3">
+                      <View className="h-10 w-10 items-center justify-center rounded-full bg-brand-tint dark:bg-brand-tint-dark">
+                        <Text className="text-base">{f.icon}</Text>
                     </View>
                     <View className="flex-1">
                       <Text className="text-sm font-semibold text-foreground">
@@ -76,10 +112,27 @@ export function SignInScreen() {
             <Button
               size="lg"
               className="rounded-xl bg-brand dark:bg-brand-dark"
-              onPress={handleSignIn}
+              onPress={() => handleSignIn('passenger')}
             >
-              시작하기
+              {isSubmittingRole === 'passenger'
+                ? '연결 중...'
+                : '교통약자 사용자로 시작'}
             </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              className="rounded-xl"
+              onPress={() => handleSignIn('staff')}
+            >
+              {isSubmittingRole === 'staff'
+                ? '연결 중...'
+                : '역무원/승무원으로 시작'}
+            </Button>
+            {errorMessage ? (
+              <Text className="text-center text-xs text-danger">
+                {errorMessage}
+              </Text>
+            ) : null}
             <Text className="text-center text-xs text-default-300">
               데모 모드 · 실제 인증은 추후 연동됩니다
             </Text>
