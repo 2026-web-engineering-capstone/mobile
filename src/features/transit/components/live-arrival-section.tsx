@@ -22,6 +22,8 @@ export function LiveArrivalSection({ stationName }: LiveArrivalSectionProps) {
   const { data, isLoading, error, refetch, isFetching } =
     useStationArrivals(stationName);
 
+  const isFallback = data?.source === 'fallback';
+
   return (
     <View className="gap-3">
       <View className="flex-row items-end justify-between">
@@ -38,6 +40,34 @@ export function LiveArrivalSection({ stationName }: LiveArrivalSectionProps) {
           {isFetching ? ' · 갱신 중' : ''}
         </Text>
       </View>
+
+      {data ? (
+        <View
+          className={`flex-row items-center gap-2 self-start rounded-full px-3 py-1 ${
+            isFallback
+              ? 'bg-warning/15 dark:bg-warning/20'
+              : 'bg-success/15 dark:bg-success/20'
+          }`}
+        >
+          <View
+            className={`h-2 w-2 rounded-full ${
+              isFallback ? 'bg-warning' : 'bg-success'
+            }`}
+          />
+          <Text
+            className={`text-[11px] font-semibold ${
+              isFallback ? 'text-warning' : 'text-success'
+            }`}
+          >
+            {isFallback ? '예시 데이터' : '실시간'}
+          </Text>
+          {isFallback && data.fallbackReason ? (
+            <Text className="ml-1 text-[11px] text-default-500">
+              {data.fallbackReason}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {isLoading ? (
         <Card className="rounded-2xl">

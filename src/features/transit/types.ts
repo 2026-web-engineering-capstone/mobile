@@ -10,6 +10,8 @@ export type StationArrivals = {
   stationName: string;
   fetchedAt: number;
   trains: ArrivalTrain[];
+  source: 'live' | 'fallback';
+  fallbackReason: string | null;
 };
 
 export type StationFacility = {
