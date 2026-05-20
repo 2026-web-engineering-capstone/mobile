@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,7 +10,12 @@ import { Header } from '@/features/home/components/header';
 import { MapSection } from '@/features/home/components/map-section';
 import { StationLineIcon } from '@/features/home/components/station-line-icon';
 import { StationSelector } from '@/features/home/components/station-selector';
-import type { StationInfo } from '@/features/home/types';
+import {
+  DEFAULT_STATION,
+  STATION_CATALOG,
+} from '@/features/home/data/station-catalog';
+import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
+import { findNearestStation } from '@/features/home/lib/find-nearest-station';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import { LiveArrivalSection } from '@/features/transit/components/live-arrival-section';
 import { LiveFacilitiesSection } from '@/features/transit/components/live-facilities-section';
@@ -19,26 +25,19 @@ import {
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
-const STATION: StationInfo = {
-  latitude: 37.3864,
-  longitude: 126.6393,
-  name: '인천대입구역',
-  previous: '지식정보단지',
-  next: '센트럴파크',
-  line: {
-    label: '인',
-    colors: {
-      primary: '#3681cb',
-      soft: '#759cce',
-    },
-  },
-};
-
 export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: requests = [] } = useSupportRequests(user?.role === 'passenger');
+  const { currentLocation } = useCurrentLocation();
+
+  const station = useMemo(() => {
+    if (!currentLocation) {
+      return DEFAULT_STATION;
+    }
+    return findNearestStation(currentLocation, STATION_CATALOG) ?? DEFAULT_STATION;
+  }, [currentLocation]);
 
   const activeRequest = requests.find(
     (request) =>
@@ -93,7 +92,7 @@ export function HomeScreen() {
             </Pressable>
           ) : null}
 
-          <MapSection station={STATION} />
+          <MapSection station={station} />
 
           <View className="gap-1">
             <Text className="text-2xl font-light tracking-tight text-foreground">
@@ -101,26 +100,26 @@ export function HomeScreen() {
             </Text>
             <Text className="text-2xl font-light tracking-tight text-foreground">
               <Text
-                style={{ color: STATION.line.colors.primary }}
+                style={{ color: station.line.colors.primary }}
                 className="font-medium"
               >
-                {STATION.name}
+                {station.name}
               </Text>{' '}
               입니다.
             </Text>
           </View>
 
-          <StationLineIcon line={STATION.line} />
+          <StationLineIcon line={station.line} />
           <StationSelector
-            currentStation={STATION.name.replace('역', '')}
-            line={STATION.line}
-            nextStation={STATION.next}
-            previousStation={STATION.previous}
+            currentStation={station.name.replace('역', '')}
+            line={station.line}
+            nextStation={station.next}
+            previousStation={station.previous}
           />
 
-          <LiveArrivalSection stationName={STATION.name} />
+          <LiveArrivalSection stationName={station.name} />
 
-          <LiveFacilitiesSection stationName={STATION.name} />
+          <LiveFacilitiesSection stationName={station.name} />
 
           {/* 주요 CTA */}
           <View className="mt-2 gap-2">
