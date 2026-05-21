@@ -5,12 +5,20 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { useQueryClient } from '@tanstack/react-query';
 import { registerPushToken, unregisterPushToken } from '@/features/auth/api/auth';
+import { BRAND_TOKENS } from '@/lib/design-tokens';
 import {
   clearCurrentPushToken,
   getCurrentPushToken,
   getPushInstallationId,
   setCurrentPushToken,
 } from '@/features/auth/push-token-session';
+import {
+  getFirebaseFcmToken,
+  isFirebaseMessagingAvailable,
+  requestFirebaseMessagingPermission,
+  subscribeFirebaseTokenRefresh,
+  subscribeForegroundFirebaseMessages,
+} from '@/lib/notifications/firebase';
 import { queryKeys } from '@/lib/query/query-keys';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -46,7 +54,7 @@ async function registerForPushNotificationsAsync() {
       name: '지원 요청 알림',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#2563EB',
+      lightColor: BRAND_TOKENS.brand,
     });
   }
 
@@ -88,17 +96,22 @@ async function registerForPushNotificationsAsync() {
 }
 
 async function syncPushToken(nextToken?: string) {
-  const token = nextToken ?? (await registerForPushNotificationsAsync());
-
-  if (!token) {
-    return;
-  }
-
   const platform = getMobilePlatform();
+  if (!platform) return;
 
-  if (!platform) {
-    return;
+  // 우선 Firebase FCM 토큰을 시도 — 자격증명/네이티브 모듈이 갖춰진 경우.
+  // 부재 시 Expo Push 토큰으로 자동 폴백.
+  let token = nextToken ?? null;
+  if (!token && isFirebaseMessagingAvailable()) {
+    const granted = await requestFirebaseMessagingPermission();
+    if (granted) {
+      token = await getFirebaseFcmToken();
+    }
   }
+  if (!token) {
+    token = await registerForPushNotificationsAsync();
+  }
+  if (!token) return;
 
   const installationId = await getPushInstallationId();
   await registerPushToken(token, platform, installationId);
@@ -162,10 +175,29 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
         });
       });
 
+    // Firebase 메시지/토큰 리스너 (자격증명/네이티브 모듈이 있을 때만 동작).
+    const firebaseForegroundUnsub = subscribeForegroundFirebaseMessages(
+      ({ requestId }) => {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.supportRequests.all,
+        });
+        if (requestId) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.supportRequests.detail(requestId),
+          });
+        }
+      },
+    );
+    const firebaseTokenRefreshUnsub = subscribeFirebaseTokenRefresh((token) => {
+      void syncPushToken(token).catch(() => undefined);
+    });
+
     return () => {
       pushTokenSubscription.remove();
       notificationReceivedSubscription.remove();
       notificationResponseSubscription.remove();
+      firebaseForegroundUnsub();
+      firebaseTokenRefreshUnsub();
     };
   }, [isAuthenticated, queryClient, user?.id]);
 

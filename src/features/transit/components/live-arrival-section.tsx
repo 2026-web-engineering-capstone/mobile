@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
-import { Card } from 'heroui-native/card';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { GyoumCard } from '@/components/ui/gyoum-primitives';
 import { useStationArrivals } from '@/features/transit/hooks/use-station-arrivals';
 import type { ArrivalTrain } from '@/features/transit/types';
 
@@ -23,94 +24,167 @@ export function LiveArrivalSection({ stationName }: LiveArrivalSectionProps) {
     useStationArrivals(stationName);
 
   return (
-    <View className="gap-3">
-      <View className="flex-row items-end justify-between">
-        <View className="gap-0.5">
-          <Text className="text-xs font-semibold uppercase tracking-widest text-brand dark:text-brand-dark">
+    <View style={{ gap: 12 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+        }}
+      >
+        <View style={{ gap: 2 }}>
+          <Text
+            style={{
+              fontFamily: pretendard('600'),
+              fontWeight: '600',
+              fontSize: 12,
+              letterSpacing: 1.2,
+              textTransform: 'uppercase',
+              color: BRAND_TOKENS.brand,
+            }}
+          >
             LIVE
           </Text>
-          <Text className="text-xl font-bold tracking-tight text-foreground">
+          <Text
+            style={{
+              fontFamily: pretendard('700'),
+              fontWeight: '700',
+              fontSize: 20,
+              letterSpacing: -0.2,
+              color: BRAND_TOKENS.text,
+            }}
+          >
             도착 정보
           </Text>
         </View>
-        <Text className="text-xs text-default-400">
+        <Text
+          style={{
+            fontFamily: pretendard('500'),
+            fontSize: 12,
+            color: BRAND_TOKENS.textMuted,
+          }}
+        >
           {stationName}
           {isFetching ? ' · 갱신 중' : ''}
         </Text>
       </View>
 
       {isLoading ? (
-        <Card className="rounded-2xl">
-          <Card.Body className="p-4">
-            <Text className="text-sm text-default-500">
-              실시간 도착 정보를 불러오고 있어요.
-            </Text>
-          </Card.Body>
-        </Card>
+        <GyoumCard padding={16}>
+          <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
+            실시간 도착 정보를 불러오고 있어요.
+          </Text>
+        </GyoumCard>
       ) : null}
 
       {error ? (
-        <Card className="rounded-2xl border border-danger/30 bg-danger/5">
-          <Card.Body className="gap-2 p-4">
-            <Text className="text-sm font-semibold text-danger">
-              실시간 도착 정보를 불러올 수 없어요
-            </Text>
-            <Text className="text-xs leading-5 text-danger">
-              {error instanceof Error
-                ? error.message
-                : '잠시 후 다시 시도해 주세요.'}
-            </Text>
-            <Text
-              className="mt-1 text-xs font-semibold text-danger underline"
-              onPress={() => {
-                void refetch();
-              }}
-            >
-              다시 시도
-            </Text>
-          </Card.Body>
-        </Card>
+        <View
+          style={{
+            gap: 8,
+            padding: 16,
+            borderRadius: RADIUS.card,
+            backgroundColor: BRAND_TOKENS.dangerBg,
+            borderWidth: 1,
+            borderColor: BRAND_TOKENS.danger,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: pretendard('600'),
+              fontWeight: '600',
+              fontSize: 14,
+              color: BRAND_TOKENS.danger,
+            }}
+          >
+            실시간 도착 정보를 불러올 수 없어요
+          </Text>
+          <Text
+            style={{
+              fontSize: 12,
+              lineHeight: 20,
+              color: BRAND_TOKENS.danger,
+            }}
+          >
+            {error instanceof Error
+              ? error.message
+              : '잠시 후 다시 시도해 주세요.'}
+          </Text>
+          <Text
+            onPress={() => {
+              void refetch();
+            }}
+            style={{
+              marginTop: 4,
+              fontFamily: pretendard('600'),
+              fontWeight: '600',
+              fontSize: 12,
+              textDecorationLine: 'underline',
+              color: BRAND_TOKENS.danger,
+            }}
+          >
+            다시 시도
+          </Text>
+        </View>
       ) : null}
 
       {!isLoading && !error && data && data.trains.length === 0 ? (
-        <Card className="rounded-2xl">
-          <Card.Body className="p-4">
-            <Text className="text-sm text-default-500">
-              현재 도착 예정인 열차가 없거나 정보가 공개되지 않은 역입니다.
-            </Text>
-          </Card.Body>
-        </Card>
+        <GyoumCard padding={16}>
+          <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
+            현재 도착 예정인 열차가 없거나 정보가 공개되지 않은 역입니다.
+          </Text>
+        </GyoumCard>
       ) : null}
 
       {!isLoading && !error && data && data.trains.length > 0 ? (
-        <View className="gap-3">
+        <View style={{ gap: 12 }}>
           {Array.from(groupByDirection(data.trains).entries()).map(
             ([direction, trains]) => (
-              <Card
-                key={direction}
-                className="rounded-2xl border border-default-200"
-              >
-                <Card.Body className="gap-2 p-4">
-                  <Text className="text-sm font-bold text-foreground">
+              <GyoumCard key={direction} padding={16}>
+                <View style={{ gap: 8 }}>
+                  <Text
+                    style={{
+                      fontFamily: pretendard('700'),
+                      fontWeight: '700',
+                      fontSize: 14,
+                      color: BRAND_TOKENS.text,
+                    }}
+                  >
                     {direction}
                   </Text>
-                  <View className="gap-1.5">
+                  <View style={{ gap: 6 }}>
                     {trains.slice(0, 4).map((train, index) => (
                       <View
                         key={`${train.trainNumber ?? index}-${train.destination}`}
-                        className="flex-row items-center justify-between"
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
                       >
-                        <Text className="flex-1 text-sm text-default-600">
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: 14,
+                            color: BRAND_TOKENS.textMid,
+                          }}
+                        >
                           {train.destination || train.trainNumber || '열차'}
                         </Text>
-                        <Text className="text-sm font-semibold text-brand dark:text-brand-dark">
+                        <Text
+                          style={{
+                            fontFamily: pretendard('600'),
+                            fontWeight: '600',
+                            fontSize: 14,
+                            color: BRAND_TOKENS.brand,
+                          }}
+                        >
                           {train.etaMessage || '도착 정보 없음'}
                         </Text>
                       </View>
                     ))}
                   </View>
-                </Card.Body>
-              </Card>
+                </View>
+              </GyoumCard>
             ),
           )}
         </View>

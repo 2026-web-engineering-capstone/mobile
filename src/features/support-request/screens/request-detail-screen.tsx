@@ -1,296 +1,380 @@
+/**
+ * 교움 디자인 시안의 역무원 요청 상세 화면.
+ *
+ * 헤더(승객 이름 + 출발/도착) → 지원 유형 → 만남 위치 + 메모 → 요청 수락 CTA.
+ * 요청 수락 후 staff-active 화면으로 이동.
+ */
+import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Button } from 'heroui-native/button';
-import { Card } from 'heroui-native/card';
-import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  ArrowRightIcon,
+  BottomBar,
+  CheckIcon,
+  Divider,
   ErrorView,
+  GyoumAppBar,
+  GyoumCTA,
+  GyoumCard,
+  LineBadge,
   LoadingView,
+  PinIcon,
+  Screen,
+  SectionLabel,
   StatusChip,
-  StatusTimeline,
+  SUPPORT_TYPE_ICONS,
 } from '@/components/ui';
+import { BRAND_TOKENS, FONT_FAMILY, getLineMeta } from '@/lib/design-tokens';
+import { ApiError } from '@/lib/api/client';
+import {
+  useAssignSupportRequest,
+  useSupportRequest,
+} from '@/features/support-request/hooks/use-support-requests';
 import {
   MEETING_POINT_LABELS,
+  SUPPORT_TYPE_DESCRIPTIONS,
   SUPPORT_TYPE_LABELS,
 } from '@/features/support-request/store/use-request-draft-store';
-import { useSupportRequest } from '@/features/support-request/hooks/use-support-requests';
 import {
+  canStaffAssignSupportRequest,
   canStaffManageSupportRequest,
-  canStaffViewPassengerCurrentLocation,
   canStaffViewSupportRequest,
-  getCancelReasonLabel,
-  getUnavailableReasonLabel,
-  SUPPORT_REQUEST_STATUS_GUIDES,
-  TERMINAL_REQUEST_STATUSES,
+  type SupportRequestDetail,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+export function RequestDetailScreen() {
+  const { requestId } = useLocalSearchParams<{ requestId: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const requestQuery = useSupportRequest(requestId);
+  const assignMutation = useAssignSupportRequest();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (requestQuery.isLoading) return <LoadingView />;
+  if (requestQuery.isError || !requestQuery.data) {
+    return <ErrorView message={requestQuery.error?.message ?? '요청을 찾을 수 없습니다.'} />;
+  }
+  const request = requestQuery.data;
+
+  // 패신저는 status 화면으로 보낸다.
+  if (user?.role === 'passenger') {
+    return <Redirect href={`/(app)/support/status/${request.id}`} />;
+  }
+  if (user?.role !== 'staff' || !canStaffViewSupportRequest(request, user)) {
+    return <ErrorView message="이 요청을 볼 권한이 없습니다." />;
+  }
+
+  const canAssign = canStaffAssignSupportRequest(request, user);
+  const canManage = canStaffManageSupportRequest(request, user);
+
+  const handleAccept = async () => {
+    setErrorMessage(null);
+    try {
+      await assignMutation.mutateAsync(request.id);
+      router.replace(`/(app)/support/active/${request.id}`);
+    } catch (error) {
+      if (error instanceof ApiError) setErrorMessage(error.message);
+      else setErrorMessage('요청 수락에 실패했습니다.');
+    }
+  };
+
   return (
-    <View className="flex-row items-start justify-between py-2">
-      <Text className="text-sm text-default-400">{label}</Text>
-      <Text className="max-w-[60%] text-right text-sm font-medium text-foreground">
-        {value}
-      </Text>
-    </View>
+    <Screen background="bg" padded={false} edges={[]}>
+      <StatusBar style="dark" />
+      <GyoumAppBar
+        title="요청 상세"
+        topInset={insets.top}
+        onBack={() => router.back()}
+      />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 140,
+          gap: 12,
+        }}
+      >
+        {/* 헤더 카드 */}
+        <GyoumCard padding={18}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: 12,
+            }}
+          >
+            <View>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 11,
+                  color: BRAND_TOKENS.textMuted,
+                  marginBottom: 4,
+                }}
+              >
+                #{request.id.slice(-6).toUpperCase()}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 22,
+                  fontWeight: '700',
+                  color: BRAND_TOKENS.text,
+                  letterSpacing: -0.4,
+                }}
+              >
+                {request.passenger_name}
+              </Text>
+            </View>
+            <StatusChip status={request.status} size="sm" />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 12 }}>
+            <RoutePoint dir="출발" stationName={request.origin_station_name} stationId={request.origin_station_id} />
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowRightIcon color={BRAND_TOKENS.textMuted} size={20} />
+            </View>
+            <RoutePoint dir="도착" stationName={request.destination_station_name} stationId={request.destination_station_id} />
+          </View>
+        </GyoumCard>
+
+        {/* 지원 유형 */}
+        <SectionLabel>요청한 지원 유형</SectionLabel>
+        <GyoumCard padding={0}>
+          {request.support_types.map((type, i) => {
+            const Icon = SUPPORT_TYPE_ICONS[type];
+            return (
+              <View key={type}>
+                {i > 0 ? <Divider inset={18} /> : null}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingHorizontal: 18,
+                    paddingVertical: 14,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: BRAND_TOKENS.brandLight,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon color={BRAND_TOKENS.brand} size={20} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontFamily: FONT_FAMILY,
+                        fontSize: 15,
+                        fontWeight: '600',
+                        color: BRAND_TOKENS.text,
+                      }}
+                    >
+                      {SUPPORT_TYPE_LABELS[type]}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: FONT_FAMILY,
+                        fontSize: 12,
+                        color: BRAND_TOKENS.textMuted,
+                      }}
+                    >
+                      {SUPPORT_TYPE_DESCRIPTIONS[type]}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </GyoumCard>
+
+        {/* 만남 위치 + 메모 */}
+        <SectionLabel>만남 위치</SectionLabel>
+        <GyoumCard padding={16}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: request.notes ? 12 : 0,
+            }}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: BRAND_TOKENS.accentLight,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <PinIcon color={BRAND_TOKENS.accent} size={20} />
+            </View>
+            <View>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: BRAND_TOKENS.text,
+                }}
+              >
+                {MEETING_POINT_LABELS[request.meeting_point]}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 12,
+                  color: BRAND_TOKENS.textMuted,
+                }}
+              >
+                출발 역 내
+              </Text>
+            </View>
+          </View>
+          {request.notes ? (
+            <View
+              style={{
+                padding: 12,
+                backgroundColor: BRAND_TOKENS.surfaceAlt,
+                borderRadius: 10,
+                borderLeftWidth: 3,
+                borderLeftColor: BRAND_TOKENS.accent,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 11,
+                  color: BRAND_TOKENS.textMuted,
+                  marginBottom: 4,
+                  fontWeight: '600',
+                }}
+              >
+                인상착의 · 메모
+              </Text>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 14,
+                  color: BRAND_TOKENS.text,
+                  lineHeight: 21,
+                }}
+              >
+                {request.notes}
+              </Text>
+            </View>
+          ) : null}
+        </GyoumCard>
+
+        {errorMessage ? (
+          <View
+            style={{
+              padding: 14,
+              borderRadius: 14,
+              backgroundColor: BRAND_TOKENS.dangerBg,
+              borderWidth: 1,
+              borderColor: BRAND_TOKENS.danger + '40',
+            }}
+          >
+            <Text style={{ fontFamily: FONT_FAMILY, color: BRAND_TOKENS.danger, fontSize: 13 }}>
+              {errorMessage}
+            </Text>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        {canAssign ? (
+          <GyoumCTA
+            variant="primary"
+            disabled={assignMutation.isPending}
+            onPress={handleAccept}
+            leadingIcon={<CheckIcon color={BRAND_TOKENS.onBrand100} size={20} />}
+          >
+            {assignMutation.isPending ? '수락 중...' : '요청 수락'}
+          </GyoumCTA>
+        ) : canManage ? (
+          <GyoumCTA
+            variant="primary"
+            onPress={() => router.push(`/(app)/support/active/${request.id}`)}
+          >
+            지원 진행하기
+          </GyoumCTA>
+        ) : (
+          <GyoumCTA variant="ghost" onPress={() => router.back()}>
+            돌아가기
+          </GyoumCTA>
+        )}
+      </BottomBar>
+    </Screen>
   );
 }
 
-function formatCoordinate(value: number) {
-  return value.toFixed(4);
-}
-
-function formatAccuracyMeters(value: number | null) {
-  if (value === null) {
-    return '알 수 없음';
-  }
-
-  return `${value}m`;
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-export function RequestDetailScreen({ requestId }: { requestId: string }) {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { role, user } = useAuth();
-  const { data: request, isLoading, error } = useSupportRequest(requestId);
-
-  if (isLoading) {
-    return (
-      <View className="flex-1 bg-background">
-        <StatusBar style="auto" />
-        <View
-          className="flex-1 items-center justify-center px-6"
-          style={{ paddingTop: insets.top }}
-        >
-          <LoadingView label="요청 정보를 불러오고 있어요" />
-        </View>
-      </View>
-    );
-  }
-
-  if (error || !request) {
-    return (
-      <View className="flex-1 bg-background">
-        <StatusBar style="auto" />
-        <View
-          className="flex-1 items-center justify-center px-6"
-          style={{ paddingTop: insets.top }}
-        >
-          <ErrorView
-            title="요청 정보를 불러오지 못했어요"
-            message="잠시 후 다시 시도하거나 뒤로 가서 다시 진입해 주세요."
-            onRetry={() => router.back()}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  const canSeeStatusTimeline = role === 'passenger';
-  const canOpenStaffStatus =
-    role === 'staff' && !TERMINAL_REQUEST_STATUSES.includes(request.status);
-  const canManageRequest = canStaffManageSupportRequest(request, user);
-  const canViewRequest =
-    (role === 'passenger' && request.passenger_id === user?.id) ||
-    canStaffViewSupportRequest(request, user);
-  const passengerCurrentLocation = canStaffViewPassengerCurrentLocation(request, user)
-    ? request.current_location
-    : null;
-  const cancelReasonLabel = getCancelReasonLabel(request.cancel_reason);
-  const unavailableReasonLabel = getUnavailableReasonLabel(request.unavailable_reason);
-  const currentGuide = cancelReasonLabel
-    ? `취소 사유: ${cancelReasonLabel}`
-    : unavailableReasonLabel
-      ? `지원 불가 사유: ${unavailableReasonLabel}`
-      : request.completion_note
-        ? `완료 메모: ${request.completion_note}`
-        : SUPPORT_REQUEST_STATUS_GUIDES[request.status];
-
-  if (!canViewRequest) {
-    return <Redirect href="/(app)/(tabs)" />;
-  }
-
+function RoutePoint({
+  dir,
+  stationName,
+  stationId,
+}: {
+  dir: '출발' | '도착';
+  stationName: string;
+  stationId: string;
+}) {
+  const lineMeta = getLineMeta(stationName);
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 100,
+    <View
+      style={{
+        flex: 1,
+        padding: 12,
+        borderRadius: 12,
+        backgroundColor: BRAND_TOKENS.surfaceAlt,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 10,
+          color: BRAND_TOKENS.textMuted,
+          marginBottom: 4,
+          fontWeight: '600',
+          letterSpacing: 0.4,
         }}
       >
-        <View className="gap-6 px-5">
-          <View className="flex-row items-center justify-between">
-            <View className="gap-1">
-              <Text className="text-xs font-semibold uppercase tracking-widest text-brand dark:text-brand-dark">
-                요청 상세
-              </Text>
-              <Text className="text-2xl font-bold tracking-tight text-foreground">
-                {request.origin_station_name} → {request.destination_station_name}
-              </Text>
-              <Text className="text-xs text-default-400">{request.id}</Text>
-            </View>
-            <StatusChip status={request.status} />
-          </View>
-
-          {/* 8 상태 가로 타임라인 */}
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-3 p-4">
-              <Text className="text-xs font-semibold uppercase tracking-widest text-default-400">
-                진행 상황
-              </Text>
-              <StatusTimeline current={request.status} />
-            </Card.Body>
-          </Card>
-
-          <Card className="rounded-2xl">
-            <Card.Body className="p-4">
-              <Text className="mb-2 text-xs font-semibold tracking-wider text-default-400">
-                요청 정보
-              </Text>
-              <InfoRow
-                label="지원 유형"
-                value={request.support_types
-                  .map((type) => SUPPORT_TYPE_LABELS[type])
-                  .join(', ')}
-              />
-              <Separator />
-              <InfoRow
-                label="만남 위치"
-                value={MEETING_POINT_LABELS[request.meeting_point]}
-              />
-              <Separator />
-              <InfoRow label="요청자" value={request.passenger_name} />
-              <Separator />
-              <InfoRow
-                label="담당 역무원"
-                value={request.assigned_staff_name ?? '미배정'}
-              />
-              <Separator />
-              <InfoRow label="요청 시간" value={formatDateTime(request.created_at)} />
-              {request.train_number ? (
-                <>
-                  <Separator />
-                  <InfoRow label="탑승 열차" value={request.train_number} />
-                </>
-              ) : null}
-              {request.train_car_number ? (
-                <>
-                  <Separator />
-                  <InfoRow label="탑승 칸" value={`${request.train_car_number}번 칸`} />
-                </>
-              ) : null}
-              {request.notes ? (
-                <>
-                  <Separator />
-                  <InfoRow label="메모" value={request.notes} />
-                </>
-              ) : null}
-            </Card.Body>
-          </Card>
-
-          <Card className="rounded-2xl border border-brand/20 dark:border-brand-dark/20">
-            <Card.Body className="gap-2 p-4">
-              <Text className="text-sm font-semibold text-brand dark:text-brand-dark">
-                현재 안내
-              </Text>
-              <Text className="text-sm leading-5 text-default-600">{currentGuide}</Text>
-            </Card.Body>
-          </Card>
-
-          {passengerCurrentLocation ? (
-            <Card className="rounded-2xl border border-default-200">
-              <Card.Body className="gap-2 p-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  승객 현재 위치
-                </Text>
-                <Text className="text-sm leading-5 text-default-500">
-                  위도 {formatCoordinate(passengerCurrentLocation.latitude)} · 경도{' '}
-                  {formatCoordinate(passengerCurrentLocation.longitude)}
-                </Text>
-                <Text className="text-xs text-default-400">
-                  정확도 {formatAccuracyMeters(passengerCurrentLocation.accuracy_meters)} · 업데이트{' '}
-                  {passengerCurrentLocation.recorded_at
-                    ? formatDateTime(passengerCurrentLocation.recorded_at)
-                    : '알 수 없음'}
-                </Text>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {role === 'passenger' && request.status === 'unavailable' ? (
-            <Card className="rounded-2xl border border-warning/30">
-              <Card.Body className="gap-3 p-4">
-                <Text className="text-sm font-semibold text-warning">
-                  지원이 어려운 상황입니다
-                </Text>
-                <Text className="text-sm leading-6 text-default-600">
-                  다음 방법을 시도해 보세요.{'\n'}
-                  • 조금 뒤 다시 요청하기{'\n'}
-                  • 다른 출발/도착 역 조합으로 요청{'\n'}
-                  • 가까운 역무원·고객안내센터에 직접 문의
-                </Text>
-                <Button
-                  size="md"
-                  className="rounded-xl bg-brand dark:bg-brand-dark"
-                  onPress={() => router.push('/(app)/(tabs)/request')}
-                >
-                  다시 요청하기
-                </Button>
-              </Card.Body>
-            </Card>
-          ) : null}
-        </View>
-      </ScrollView>
-
+        {dir}
+      </Text>
       <View
-        className="flex-row gap-3 border-t border-default-100 bg-background px-5 pt-3"
-        style={{ paddingBottom: insets.bottom + 12 }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginBottom: 2,
+        }}
       >
-        <Button
-          size="lg"
-          variant="outline"
-          className="flex-1 rounded-xl"
-          onPress={() => router.back()}
+        <LineBadge char={lineMeta.char} color={lineMeta.color} size={18} />
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 14,
+            fontWeight: '700',
+            color: BRAND_TOKENS.text,
+            flexShrink: 1,
+          }}
+          numberOfLines={1}
         >
-          뒤로
-        </Button>
-        {canSeeStatusTimeline ? (
-          <Button
-            size="lg"
-            className="flex-1 rounded-xl bg-brand dark:bg-brand-dark"
-            onPress={() => router.push(`/(app)/support/status/${requestId}`)}
-          >
-            상태 타임라인
-          </Button>
-        ) : canOpenStaffStatus ? (
-          <Button
-            size="lg"
-            className="flex-1 rounded-xl bg-brand dark:bg-brand-dark"
-            onPress={() => router.push(`/(app)/support/status/${requestId}`)}
-          >
-            {canManageRequest ? '처리 화면' : '상태 확인'}
-          </Button>
-        ) : null}
+          {stationName}
+        </Text>
       </View>
     </View>
   );

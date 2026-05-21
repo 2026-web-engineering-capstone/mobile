@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
-import { Button } from 'heroui-native';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { GyoumCTA } from './gyoum-primitives';
 
 interface ErrorViewProps {
   title?: string;
@@ -14,20 +15,45 @@ export function ErrorView({
 }: ErrorViewProps) {
   return (
     <View
-      className="items-center justify-center gap-3 rounded-3xl bg-danger-bg px-6 py-8 dark:bg-danger-bg-dark"
+      style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        borderRadius: RADIUS.card,
+        backgroundColor: BRAND_TOKENS.dangerBg,
+        paddingHorizontal: 24,
+        paddingVertical: 32,
+      }}
       accessibilityRole="alert"
     >
-      <Text className="text-center text-lg font-semibold text-danger dark:text-danger-dark">
+      <Text
+        style={{
+          textAlign: 'center',
+          fontFamily: pretendard('600'),
+          fontWeight: '600',
+          fontSize: 18,
+          color: BRAND_TOKENS.danger,
+        }}
+      >
         {title}
       </Text>
-      <Text className="text-center text-sm leading-6 text-danger dark:text-danger-dark">
+      <Text
+        style={{
+          textAlign: 'center',
+          fontFamily: pretendard('500'),
+          fontWeight: '500',
+          fontSize: 14,
+          lineHeight: 22,
+          color: BRAND_TOKENS.danger,
+        }}
+      >
         {message}
       </Text>
       {onRetry ? (
-        <View className="mt-2">
-          <Button variant="secondary" onPress={onRetry}>
-            <Button.LabelContent>다시 시도</Button.LabelContent>
-          </Button>
+        <View style={{ marginTop: 8, alignSelf: 'stretch' }}>
+          <GyoumCTA variant="soft" size="md" onPress={onRetry}>
+            다시 시도
+          </GyoumCTA>
         </View>
       ) : null}
     </View>

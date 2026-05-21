@@ -8,6 +8,7 @@ export function fetchSession() {
 export function signIn(
   role: Role,
   options?: {
+    stationId?: string | null;
     installationId?: string;
     pushToken?: string;
     pushPlatform?: 'ios' | 'android';
@@ -17,6 +18,7 @@ export function signIn(
     method: 'POST',
     body: JSON.stringify({
       role,
+      station_id: options?.stationId ?? null,
       installation_id: options?.installationId ?? null,
       push_token: options?.pushToken ?? null,
       push_platform: options?.pushPlatform ?? null,

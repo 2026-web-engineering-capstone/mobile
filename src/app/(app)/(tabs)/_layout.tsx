@@ -1,13 +1,12 @@
 import { Tabs } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, useColorScheme } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/providers/auth-provider';
+import { BRAND_TOKENS, pretendard } from '@/lib/design-tokens';
 
 function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const { role } = useAuth();
   const isPassenger = role === 'passenger';
   const isStaff = role === 'staff';
@@ -16,14 +15,15 @@ function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: isDark ? '#6aafe0' : '#3681cb',
-        tabBarInactiveTintColor: isDark ? '#a1a1aa' : '#6b7280',
+        tabBarActiveTintColor: BRAND_TOKENS.brand,
+        tabBarInactiveTintColor: BRAND_TOKENS.textMuted,
         tabBarIconStyle: {
           marginBottom: 0,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '600',
+          fontFamily: pretendard('600'),
         },
         tabBarItemStyle: {
           paddingTop: 4,
@@ -34,11 +34,9 @@ function TabsLayout() {
           paddingTop: 6,
           paddingHorizontal: 8,
           paddingBottom: Math.max(insets.bottom, 8),
-          backgroundColor: isDark ? '#18181b' : '#ffffff',
+          backgroundColor: BRAND_TOKENS.surface,
           borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: isDark
-            ? 'rgba(255, 255, 255, 0.1)'
-            : 'rgba(15, 23, 42, 0.08)',
+          borderTopColor: BRAND_TOKENS.border,
         },
       }}
     >

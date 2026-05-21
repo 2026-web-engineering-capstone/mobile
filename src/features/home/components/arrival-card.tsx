@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
-import { Card, Separator } from 'heroui-native';
+import { BRAND_TOKENS, pretendard } from '@/lib/design-tokens';
+import { GyoumCard } from '@/components/ui/gyoum-primitives';
 
 type ArrivalRow = {
   destination: string;
@@ -14,25 +15,55 @@ type ArrivalCardProps = {
 
 export function ArrivalCard({ rows, title, etaColor }: ArrivalCardProps) {
   return (
-    <Card className="min-w-0 flex-1 rounded-lg border border-default-200 bg-background shadow-none">
-      <Card.Body className="gap-3">
-        <Text className="text-sm font-bold leading-5 text-foreground">{title}</Text>
-        <Separator />
-        {rows.map((row) => (
-          <View
-            key={`${title}-${row.destination}-${row.eta}`}
-            className="flex-row items-center justify-between"
+    <View style={{ flex: 1, minWidth: 0 }}>
+      <GyoumCard padding={16}>
+        <View style={{ gap: 12 }}>
+          <Text
+            style={{
+              fontFamily: pretendard('700'),
+              fontWeight: '700',
+              fontSize: 14,
+              lineHeight: 20,
+              color: BRAND_TOKENS.text,
+            }}
           >
-            <Text className="shrink text-xs text-default-400">{row.destination}</Text>
-            <Text
-              className="ml-3 text-xs font-medium"
-              style={etaColor ? { color: etaColor } : undefined}
+            {title}
+          </Text>
+          <View style={{ height: 1, backgroundColor: BRAND_TOKENS.border }} />
+          {rows.map((row) => (
+            <View
+              key={`${title}-${row.destination}-${row.eta}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
             >
-              {row.eta}
-            </Text>
-          </View>
-        ))}
-      </Card.Body>
-    </Card>
+              <Text
+                style={{
+                  flexShrink: 1,
+                  fontFamily: pretendard('500'),
+                  fontSize: 12,
+                  color: BRAND_TOKENS.textMuted,
+                }}
+              >
+                {row.destination}
+              </Text>
+              <Text
+                style={{
+                  marginLeft: 12,
+                  fontFamily: pretendard('500'),
+                  fontWeight: '500',
+                  fontSize: 12,
+                  color: etaColor ?? BRAND_TOKENS.text,
+                }}
+              >
+                {row.eta}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </GyoumCard>
+    </View>
   );
 }

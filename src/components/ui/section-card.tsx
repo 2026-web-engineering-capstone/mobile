@@ -1,6 +1,7 @@
 import { PropsWithChildren } from 'react';
 import { Text, View } from 'react-native';
-import { Card, Separator } from 'heroui-native';
+import { BRAND_TOKENS, pretendard } from '@/lib/design-tokens';
+import { GyoumCard } from './gyoum-primitives';
 
 type SectionCardProps = PropsWithChildren<{
   eyebrow?: string;
@@ -15,26 +16,57 @@ export function SectionCard({
   title,
 }: SectionCardProps) {
   return (
-    <Card variant="default" className="rounded-3xl px-5 py-5">
-      <Card.Body className="gap-4">
-        <View className="gap-1">
+    <GyoumCard>
+      <View style={{ gap: 16 }}>
+        <View style={{ gap: 4 }}>
           {eyebrow ? (
-            <Text className="text-xs font-semibold uppercase tracking-widest text-accent">
+            <Text
+              style={{
+                fontFamily: pretendard('600'),
+                fontWeight: '600',
+                fontSize: 12,
+                letterSpacing: 1.2,
+                textTransform: 'uppercase',
+                color: BRAND_TOKENS.accent,
+              }}
+            >
               {eyebrow}
             </Text>
           ) : null}
-          <Card.Title className="text-3xl leading-9 text-surface-foreground">
+          <Text
+            style={{
+              fontFamily: pretendard('700'),
+              fontWeight: '700',
+              fontSize: 22,
+              lineHeight: 32,
+              color: BRAND_TOKENS.text,
+            }}
+          >
             {title}
-          </Card.Title>
+          </Text>
           {description ? (
-            <Card.Description className="text-sm leading-6 text-muted">
+            <Text
+              style={{
+                fontFamily: pretendard('500'),
+                fontWeight: '500',
+                fontSize: 14,
+                lineHeight: 22,
+                color: BRAND_TOKENS.textMuted,
+              }}
+            >
               {description}
-            </Card.Description>
+            </Text>
           ) : null}
         </View>
-        <Separator className="opacity-50" />
+        <View
+          style={{
+            height: 1,
+            backgroundColor: BRAND_TOKENS.border,
+            opacity: 0.5,
+          }}
+        />
         {children}
-      </Card.Body>
-    </Card>
+      </View>
+    </GyoumCard>
   );
 }

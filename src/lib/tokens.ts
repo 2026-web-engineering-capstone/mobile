@@ -15,7 +15,7 @@ export const STATUS_TONE: Record<
   }
 > = {
   submitted: {
-    label: '접수',
+    label: '요청 접수',
     chipClassName:
       'bg-status-submitted-bg text-status-submitted dark:bg-status-submitted-bg-dark dark:text-status-submitted-dark',
     dotClassName: 'bg-status-submitted dark:bg-status-submitted-dark',
@@ -23,7 +23,7 @@ export const STATUS_TONE: Record<
     badgeTextClassName: 'text-status-submitted dark:text-status-submitted-dark',
   },
   assigned: {
-    label: '배정',
+    label: '담당자 배정',
     chipClassName:
       'bg-status-assigned-bg text-status-assigned dark:bg-status-assigned-bg-dark dark:text-status-assigned-dark',
     dotClassName: 'bg-status-assigned dark:bg-status-assigned-dark',
@@ -31,7 +31,7 @@ export const STATUS_TONE: Record<
     badgeTextClassName: 'text-status-assigned dark:text-status-assigned-dark',
   },
   in_progress: {
-    label: '지원 중',
+    label: '역무원 도착',
     chipClassName:
       'bg-status-in-progress-bg text-status-in-progress dark:bg-status-in-progress-bg-dark dark:text-status-in-progress-dark',
     dotClassName: 'bg-status-in-progress dark:bg-status-in-progress-dark',
@@ -49,7 +49,7 @@ export const STATUS_TONE: Record<
     badgeTextClassName: 'text-status-boarded dark:text-status-boarded-dark',
   },
   awaiting_dropoff: {
-    label: '하차 대기',
+    label: '하차 역 대기',
     chipClassName:
       'bg-status-awaiting-dropoff-bg text-status-awaiting-dropoff dark:bg-status-awaiting-dropoff-bg-dark dark:text-status-awaiting-dropoff-dark',
     dotClassName:
@@ -60,7 +60,7 @@ export const STATUS_TONE: Record<
       'text-status-awaiting-dropoff dark:text-status-awaiting-dropoff-dark',
   },
   completed: {
-    label: '완료',
+    label: '지원 완료',
     chipClassName:
       'bg-status-completed-bg text-status-completed dark:bg-status-completed-bg-dark dark:text-status-completed-dark',
     dotClassName: 'bg-status-completed dark:bg-status-completed-dark',
@@ -69,7 +69,7 @@ export const STATUS_TONE: Record<
       'text-status-completed dark:text-status-completed-dark',
   },
   cancelled: {
-    label: '취소',
+    label: '취소됨',
     chipClassName:
       'bg-status-cancelled-bg text-status-cancelled dark:bg-status-cancelled-bg-dark dark:text-status-cancelled-dark',
     dotClassName: 'bg-status-cancelled dark:bg-status-cancelled-dark',
@@ -105,29 +105,102 @@ export const TERMINAL_STATUSES: SupportRequestStatus[] = [
 ];
 
 /**
- * 폰트 스케일별 실제 크기 매핑. RN Text style에서 직접 사용.
+ * DESIGN.md typography 슬롯 — 10종.
+ * 각 슬롯은 RN TextStyle 호환 형태로 노출된다.
+ * 폰트 스케일(`lg`)은 fontSize/lineHeight에 배율을 곱해 접근성 확대를 지원한다.
  */
-export const TEXT_SCALE = {
-  md: {
-    bodyXs: 12,
-    bodySm: 14,
-    body: 16,
-    bodyLg: 18,
-    titleSm: 20,
-    title: 24,
-    titleLg: 30,
-    titleXl: 36,
-  },
-  lg: {
-    bodyXs: 14,
-    bodySm: 16,
-    body: 18,
-    bodyLg: 20,
-    titleSm: 24,
-    title: 28,
-    titleLg: 34,
-    titleXl: 40,
-  },
-} as const;
+export type TypoSlot =
+  | 'caption-xs'
+  | 'caption'
+  | 'meta'
+  | 'label-caps'
+  | 'body-sm'
+  | 'body-md'
+  | 'body'
+  | 'body-lg'
+  | 'number-lg'
+  | 'title';
 
-export type FontScale = keyof typeof TEXT_SCALE;
+export interface TypoToken {
+  readonly fontSize: number;
+  readonly fontWeight:
+    | 'normal'
+    | 'bold'
+    | '100'
+    | '200'
+    | '300'
+    | '400'
+    | '500'
+    | '600'
+    | '700'
+    | '800'
+    | '900';
+  readonly lineHeight: number;
+  readonly letterSpacing?: number;
+  readonly textTransform?: 'none' | 'uppercase';
+}
+
+/** DESIGN.md typography 블록을 RN style 단위(px → number)로 그대로 포팅. */
+export const TEXT_SCALE: Readonly<Record<TypoSlot, TypoToken>> = {
+  'caption-xs': {
+    fontSize: 10,
+    fontWeight: '600',
+    lineHeight: 14,
+    letterSpacing: 0.2, // 0.02em * 10
+  },
+  caption: {
+    fontSize: 11,
+    fontWeight: '500',
+    lineHeight: 14,
+  },
+  meta: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  'label-caps': {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 16,
+    letterSpacing: -0.065, // -0.005em * 13
+    textTransform: 'uppercase',
+  },
+  'body-sm': {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: -0.14, // -0.01em * 14
+  },
+  'body-md': {
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    letterSpacing: -0.15,
+  },
+  body: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
+    letterSpacing: -0.16,
+  },
+  'body-lg': {
+    fontSize: 17,
+    fontWeight: '600',
+    lineHeight: 24,
+    letterSpacing: -0.17,
+  },
+  'number-lg': {
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 28,
+    letterSpacing: -0.44, // -0.02em
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 32,
+    letterSpacing: -0.78, // -0.03em
+  },
+};
+
+export type FontScale = 'md' | 'lg';

@@ -1,97 +1,137 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Button } from 'heroui-native/button';
-import { Card } from 'heroui-native/card';
-import { Separator } from 'heroui-native/separator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import {
+  GyoumCard,
+  GyoumCTA,
+  LineBadge,
+  PageTitle,
+} from '@/components/ui/gyoum-primitives';
+import { Screen } from '@/components/ui/screen';
 import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
 
 export function FavoritesScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const favoriteStations = useStationPreferencesStore((state) => state.favoriteStations);
+  const favoriteStations = useStationPreferencesStore(
+    (state) => state.favoriteStations,
+  );
   const removeFavoriteStation = useStationPreferencesStore(
     (state) => state.removeFavoriteStation,
   );
 
   return (
-    <View className="flex-1 bg-background">
+    <Screen scrollable padded>
       <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 24,
-        }}
-      >
-        <View className="gap-5 px-5">
-          <View className="gap-1">
-            <Text className="text-2xl font-bold tracking-tight text-foreground">
-              즐겨찾기 역
-            </Text>
-            <Text className="text-sm text-default-400">
-              자주 이용하는 역을 빠르게 선택하세요
-            </Text>
-          </View>
+      <View style={{ gap: 20 }}>
+        <PageTitle sub="자주 이용하는 역을 빠르게 선택하세요">
+          즐겨찾기 역
+        </PageTitle>
 
-          {favoriteStations.length > 0 ? (
-            <Card className="rounded-2xl">
-              <Card.Body className="p-0">
-                {favoriteStations.map((station, index) => (
-                  <View key={station.name}>
-                    {index > 0 ? <Separator /> : null}
-                    <View className="flex-row items-center gap-4 px-5 py-4">
-                      <View
-                        className="h-8 w-8 items-center justify-center rounded-full"
-                        style={{ backgroundColor: station.line_color }}
-                      >
-                        <Text className="text-xs font-bold text-white">인</Text>
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-sm font-semibold text-foreground">
-                          {station.name}
-                        </Text>
-                        <Text className="text-xs text-default-400">
-                          {station.line}
-                        </Text>
-                      </View>
-                      <Pressable
-                        className="rounded-lg bg-danger-50 px-3 py-1.5"
-                        onPress={() => removeFavoriteStation(station.id)}
-                      >
-                        <Text className="text-xs font-medium text-danger">
-                          삭제
-                        </Text>
-                      </Pressable>
-                    </View>
+        {favoriteStations.length > 0 ? (
+          <GyoumCard padding={0}>
+            {favoriteStations.map((station, index) => (
+              <View key={station.name}>
+                {index > 0 ? (
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: BRAND_TOKENS.border,
+                      marginHorizontal: 20,
+                    }}
+                  />
+                ) : null}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 16,
+                    paddingHorizontal: 20,
+                    paddingVertical: 16,
+                  }}
+                >
+                  <LineBadge color={station.line_color} char="인" size={32} />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontFamily: pretendard('600'),
+                        fontWeight: '600',
+                        fontSize: 14,
+                        color: BRAND_TOKENS.text,
+                      }}
+                    >
+                      {station.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: BRAND_TOKENS.textMuted,
+                      }}
+                    >
+                      {station.line}
+                    </Text>
                   </View>
-                ))}
-              </Card.Body>
-            </Card>
-          ) : (
-            <Card className="rounded-2xl">
-              <Card.Body className="items-center gap-3 p-8">
-                <Text className="text-3xl">⭐</Text>
-                <Text className="text-sm text-default-400">
-                  즐겨찾기한 역이 없습니다
-                </Text>
-                <Text className="text-center text-xs leading-5 text-default-300">
-                  역 검색에서 자주 이용하는 역을 추가해보세요
-                </Text>
-              </Card.Body>
-            </Card>
-          )}
+                  <Pressable
+                    style={{
+                      borderRadius: RADIUS.sm,
+                      backgroundColor: BRAND_TOKENS.dangerBg,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                    }}
+                    onPress={() => removeFavoriteStation(station.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${station.name} 즐겨찾기 삭제`}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: pretendard('500'),
+                        fontWeight: '500',
+                        fontSize: 12,
+                        color: BRAND_TOKENS.danger,
+                      }}
+                    >
+                      삭제
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </GyoumCard>
+        ) : (
+          <GyoumCard padding={32}>
+            <View style={{ alignItems: 'center', gap: 12 }}>
+              <Text style={{ fontSize: 32 }}>⭐</Text>
+              <Text
+                style={{
+                  fontFamily: pretendard('500'),
+                  fontSize: 14,
+                  color: BRAND_TOKENS.textMuted,
+                }}
+              >
+                즐겨찾기한 역이 없습니다
+              </Text>
+              <Text
+                style={{
+                  textAlign: 'center',
+                  fontSize: 12,
+                  lineHeight: 20,
+                  color: BRAND_TOKENS.textMuted,
+                }}
+              >
+                역 검색에서 자주 이용하는 역을 추가해보세요
+              </Text>
+            </View>
+          </GyoumCard>
+        )}
 
-          <Button
-            variant="secondary"
-            className="rounded-xl"
-            onPress={() => router.push('/(app)/stations/search')}
-          >
-            역 추가하기
-          </Button>
-        </View>
-      </ScrollView>
-    </View>
+        <GyoumCTA
+          variant="soft"
+          size="md"
+          onPress={() => router.push('/(app)/stations/search')}
+        >
+          역 추가하기
+        </GyoumCTA>
+      </View>
+    </Screen>
   );
 }

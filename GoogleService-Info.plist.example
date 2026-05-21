@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  이 파일은 PLACEHOLDER입니다. Firebase 콘솔에서 다운로드한 실제 GoogleService-Info.plist로 교체하세요.
+
+  1. https://console.firebase.google.com 에서 프로젝트 생성
+  2. iOS 앱 추가 시 번들 ID: com.gyoum.mobile
+  3. GoogleService-Info.plist 다운로드 후 이 파일과 같은 위치(frontend/GoogleService-Info.plist)에 저장
+  4. frontend/yarn prebuild:clean && yarn ios 로 네이티브 모듈 재생성
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>BUNDLE_ID</key>
+  <string>com.gyoum.mobile</string>
+  <key>PROJECT_ID</key>
+  <string>PLACEHOLDER</string>
+  <key>GOOGLE_APP_ID</key>
+  <string>PLACEHOLDER</string>
+  <key>API_KEY</key>
+  <string>PLACEHOLDER</string>
+  <key>GCM_SENDER_ID</key>
+  <string>PLACEHOLDER</string>
+  <key>STORAGE_BUCKET</key>
+  <string>PLACEHOLDER.appspot.com</string>
+  <key>IS_ADS_ENABLED</key><false/>
+  <key>IS_ANALYTICS_ENABLED</key><false/>
+  <key>IS_APPINVITE_ENABLED</key><false/>
+  <key>IS_GCM_ENABLED</key><true/>
+  <key>IS_SIGNIN_ENABLED</key><false/>
+</dict>
+</plist>

@@ -1,12 +1,10 @@
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Card } from 'heroui-native/card';
-import { Separator } from 'heroui-native/separator';
-import { Switch } from 'heroui-native/switch';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { GyoumCard, PageTitle } from '@/components/ui/gyoum-primitives';
+import { Screen } from '@/components/ui/screen';
 import { useAppStore } from '@/store/app-store';
 import type { ThemePreference } from '@/store/app-store';
-import { Pressable } from 'react-native';
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] =
   [
@@ -16,7 +14,6 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] =
   ];
 
 export function AccessibilityScreen() {
-  const insets = useSafeAreaInsets();
   const {
     fontScale,
     highContrast,
@@ -27,117 +24,184 @@ export function AccessibilityScreen() {
   } = useAppStore();
 
   return (
-    <View className="flex-1 bg-background">
+    <Screen scrollable padded>
       <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 24,
-        }}
-      >
-        <View className="gap-6 px-5">
-          <View className="gap-1">
-            <Text className="text-2xl font-bold tracking-tight text-foreground">
-              접근성 설정
-            </Text>
-            <Text className="text-sm text-default-400">
-              읽기 편한 환경을 설정하세요
-            </Text>
-          </View>
+      <View style={{ gap: 24 }}>
+        <PageTitle sub="읽기 편한 환경을 설정하세요">접근성 설정</PageTitle>
 
-          {/* 디스플레이 */}
-          <Card className="rounded-2xl">
-            <Card.Body className="p-0">
-              <View className="flex-row items-center justify-between px-5 py-4">
-                <View className="flex-1 gap-0.5">
-                  <Text className="text-sm font-semibold text-foreground">
-                    큰 글씨
-                  </Text>
-                  <Text className="text-xs text-default-400">
-                    현재: {fontScale === 'lg' ? '크게' : '기본'}
-                  </Text>
-                </View>
-                <Switch
-                  isSelected={fontScale === 'lg'}
-                  onSelectedChange={toggleFontScale}
-                />
-              </View>
-              <Separator />
-              <View className="flex-row items-center justify-between px-5 py-4">
-                <View className="flex-1 gap-0.5">
-                  <Text className="text-sm font-semibold text-foreground">
-                    고대비 모드
-                  </Text>
-                  <Text className="text-xs text-default-400">
-                    텍스트와 배경의 대비를 높입니다
-                  </Text>
-                </View>
-                <Switch
-                  isSelected={highContrast}
-                  onSelectedChange={toggleHighContrast}
-                />
-              </View>
-            </Card.Body>
-          </Card>
-
-          {/* 테마 */}
-          <View className="gap-3">
-            <Text className="text-xs font-semibold tracking-wider text-default-400">
-              테마
-            </Text>
-            <View className="flex-row gap-3">
-              {THEME_OPTIONS.map((option) => {
-                const selected = themePreference === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    className={`flex-1 items-center gap-2 rounded-2xl border-2 py-5 ${
-                      selected
-                        ? 'border-brand bg-brand-surface dark:border-brand-dark dark:bg-brand-surface-dark'
-                        : 'border-default-200 bg-background'
-                    }`}
-                    onPress={() => setThemePreference(option.value)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${option.label} 테마 선택`}
-                  >
-                    <Text className="text-2xl">{option.icon}</Text>
-                    <Text
-                      className={`text-sm ${
-                        selected
-                          ? 'font-semibold text-brand dark:text-brand-dark'
-                          : 'text-default-600'
-                      }`}
-                    >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+        <GyoumCard padding={0}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+            }}
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{
+                  fontFamily: pretendard('600'),
+                  fontWeight: '600',
+                  fontSize: 14,
+                  color: BRAND_TOKENS.text,
+                }}
+              >
+                큰 글씨
+              </Text>
+              <Text style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}>
+                현재: {fontScale === 'lg' ? '크게' : '기본'}
+              </Text>
             </View>
+            <Switch
+              value={fontScale === 'lg'}
+              onValueChange={toggleFontScale}
+              trackColor={{
+                false: BRAND_TOKENS.borderStrong,
+                true: BRAND_TOKENS.brand,
+              }}
+              thumbColor={BRAND_TOKENS.onBrand100}
+              ios_backgroundColor={BRAND_TOKENS.borderStrong}
+            />
           </View>
+          <View
+            style={{
+              height: 1,
+              backgroundColor: BRAND_TOKENS.border,
+              marginHorizontal: 20,
+            }}
+          />
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+            }}
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text
+                style={{
+                  fontFamily: pretendard('600'),
+                  fontWeight: '600',
+                  fontSize: 14,
+                  color: BRAND_TOKENS.text,
+                }}
+              >
+                고대비 모드
+              </Text>
+              <Text style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}>
+                텍스트와 배경의 대비를 높입니다
+              </Text>
+            </View>
+            <Switch
+              value={highContrast}
+              onValueChange={toggleHighContrast}
+              trackColor={{
+                false: BRAND_TOKENS.borderStrong,
+                true: BRAND_TOKENS.brand,
+              }}
+              thumbColor={BRAND_TOKENS.onBrand100}
+              ios_backgroundColor={BRAND_TOKENS.borderStrong}
+            />
+          </View>
+        </GyoumCard>
 
-          {/* 미리보기 */}
-          <Card className="rounded-2xl bg-default-50">
-            <Card.Body className="gap-2 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-default-400">
-                미리보기
-              </Text>
-              <Text
-                className={`font-medium text-foreground ${fontScale === 'lg' ? 'text-xl' : 'text-base'}`}
-              >
-                인천대입구역 → 센트럴파크역
-              </Text>
-              <Text
-                className={`text-default-500 ${fontScale === 'lg' ? 'text-base' : 'text-sm'}`}
-              >
-                휠체어 발판 지원 · 엘리베이터 앞 만남
-              </Text>
-            </Card.Body>
-          </Card>
+        <View style={{ gap: 12 }}>
+          <Text
+            style={{
+              fontFamily: pretendard('600'),
+              fontWeight: '600',
+              fontSize: 12,
+              letterSpacing: 0.6,
+              color: BRAND_TOKENS.textMuted,
+            }}
+          >
+            테마
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {THEME_OPTIONS.map((option) => {
+              const selected = themePreference === option.value;
+              return (
+                <Pressable
+                  key={option.value}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    gap: 8,
+                    borderRadius: RADIUS.card,
+                    borderWidth: 2,
+                    paddingVertical: 20,
+                    borderColor: selected
+                      ? BRAND_TOKENS.brand
+                      : BRAND_TOKENS.border,
+                    backgroundColor: selected
+                      ? BRAND_TOKENS.brandSubtle
+                      : BRAND_TOKENS.surface,
+                  }}
+                  onPress={() => setThemePreference(option.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${option.label} 테마 선택`}
+                >
+                  <Text style={{ fontSize: 24 }}>{option.icon}</Text>
+                  <Text
+                    style={{
+                      fontFamily: pretendard(selected ? '600' : '500'),
+                      fontWeight: selected ? '600' : '500',
+                      fontSize: 14,
+                      color: selected
+                        ? BRAND_TOKENS.brand
+                        : BRAND_TOKENS.textMid,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </ScrollView>
-    </View>
+
+        <GyoumCard
+          padding={16}
+          style={{ backgroundColor: BRAND_TOKENS.surfaceAlt }}
+        >
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{
+                fontFamily: pretendard('600'),
+                fontWeight: '600',
+                fontSize: 12,
+                letterSpacing: 0.6,
+                color: BRAND_TOKENS.textMuted,
+              }}
+            >
+              미리보기
+            </Text>
+            <Text
+              style={{
+                fontFamily: pretendard('500'),
+                fontWeight: '500',
+                fontSize: fontScale === 'lg' ? 20 : 16,
+                color: BRAND_TOKENS.text,
+              }}
+            >
+              인천대입구역 → 센트럴파크역
+            </Text>
+            <Text
+              style={{
+                fontSize: fontScale === 'lg' ? 16 : 14,
+                color: BRAND_TOKENS.textMid,
+              }}
+            >
+              휠체어 발판 지원 · 엘리베이터 앞 만남
+            </Text>
+          </View>
+        </GyoumCard>
+      </View>
+    </Screen>
   );
 }

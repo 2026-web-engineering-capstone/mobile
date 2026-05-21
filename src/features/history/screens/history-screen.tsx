@@ -1,18 +1,16 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Card } from 'heroui-native/card';
-import { Separator } from 'heroui-native/separator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { GyoumCard } from '@/components/ui/gyoum-primitives';
 import {
   EmptyView,
   ErrorView,
   LoadingView,
+  Screen,
   StatusChip,
 } from '@/components/ui';
-import {
-  SUPPORT_TYPE_LABELS,
-} from '@/features/support-request/store/use-request-draft-store';
+import { SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import { TERMINAL_REQUEST_STATUSES } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
@@ -35,7 +33,6 @@ function formatDateTime(value: string) {
 
 export function HistoryScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { role } = useAuth();
   const isPassenger = role === 'passenger';
   const { data = [], isLoading, error, refetch } = useSupportRequests(
@@ -44,10 +41,7 @@ export function HistoryScreen() {
   );
   const historyItems = data
     .filter((item) => TERMINAL_REQUEST_STATUSES.includes(item.status))
-    .sort(
-      (a, b) =>
-        Date.parse(b.created_at) - Date.parse(a.created_at),
-    );
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 
   const completedCount = historyItems.filter(
     (item) => item.status === 'completed',
@@ -64,114 +58,186 @@ export function HistoryScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <Screen scrollable padded>
       <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 24,
+      <View style={{ gap: 20 }}>
+        <View style={{ gap: 8 }}>
+          <Text
+            style={{
+              fontFamily: pretendard('600'),
+              fontWeight: '600',
+              fontSize: 12,
+              letterSpacing: 1.2,
+              textTransform: 'uppercase',
+              color: BRAND_TOKENS.brand,
+            }}
+          >
+            HISTORY
+          </Text>
+          <Text
+            style={{
+              fontFamily: pretendard('700'),
+              fontWeight: '700',
+              fontSize: 24,
+              letterSpacing: -0.4,
+              color: BRAND_TOKENS.text,
+            }}
+          >
+            완료된 이용 내역
+          </Text>
+          <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
+            종료된 요청 {historyItems.length}건
+          </Text>
+        </View>
+
+        {!isLoading && !error && historyItems.length > 0 ? (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <SummaryCell
+              count={completedCount}
+              label="완료"
+              fg={BRAND_TOKENS.success}
+              bg={BRAND_TOKENS.successBg}
+            />
+            <SummaryCell
+              count={cancelledCount}
+              label="취소"
+              fg={BRAND_TOKENS.danger}
+              bg={BRAND_TOKENS.dangerBg}
+            />
+            <SummaryCell
+              count={unavailableCount}
+              label="지원 불가"
+              fg={BRAND_TOKENS.warning}
+              bg={BRAND_TOKENS.warningBg}
+            />
+          </View>
+        ) : null}
+
+        {isLoading ? <LoadingView label="이용 내역을 불러오고 있어요" /> : null}
+        {error ? (
+          <ErrorView
+            title="이용 내역을 불러오지 못했어요"
+            onRetry={() => {
+              void refetch();
+            }}
+          />
+        ) : null}
+        {!isLoading && !error && historyItems.length === 0 ? (
+          <EmptyView
+            title="아직 종료된 요청이 없어요"
+            description="진행 중인 요청은 홈 화면에서 확인할 수 있어요."
+          />
+        ) : null}
+
+        <View style={{ gap: 12 }}>
+          {historyItems.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => router.push(`/(app)/support/${item.id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.origin_station_name}에서 ${item.destination_station_name}, ${formatDateTime(item.created_at)}`}
+            >
+              <GyoumCard padding={16}>
+                <View style={{ gap: 12 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text
+                        style={{
+                          fontFamily: pretendard('600'),
+                          fontWeight: '600',
+                          fontSize: 16,
+                          color: BRAND_TOKENS.text,
+                        }}
+                      >
+                        {item.origin_station_name}{' '}
+                        <Text style={{ color: BRAND_TOKENS.borderStrong }}>
+                          →
+                        </Text>{' '}
+                        {item.destination_station_name}
+                      </Text>
+                      <Text
+                        style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}
+                      >
+                        {formatDateTime(item.created_at)}
+                      </Text>
+                    </View>
+                    <StatusChip status={item.status} size="sm" />
+                  </View>
+                  <View
+                    style={{ height: 1, backgroundColor: BRAND_TOKENS.border }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 12,
+                        color: BRAND_TOKENS.textMuted,
+                      }}
+                    >
+                      {item.support_types
+                        .map((type) => SUPPORT_TYPE_LABELS[type])
+                        .join(', ')}
+                    </Text>
+                    <Text
+                      style={{ fontSize: 12, color: BRAND_TOKENS.borderStrong }}
+                    >
+                      {item.id}
+                    </Text>
+                  </View>
+                </View>
+              </GyoumCard>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </Screen>
+  );
+}
+
+interface SummaryCellProps {
+  count: number;
+  label: string;
+  fg: string;
+  bg: string;
+}
+
+function SummaryCell({ count, label, fg, bg }: SummaryCellProps) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        gap: 4,
+        borderRadius: RADIUS.card,
+        backgroundColor: bg,
+        padding: 12,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: pretendard('700'),
+          fontWeight: '700',
+          fontSize: 18,
+          color: fg,
         }}
       >
-        <View className="gap-5 px-5">
-          <View className="gap-2">
-            <Text className="text-xs font-semibold uppercase tracking-widest text-brand dark:text-brand-dark">
-              HISTORY
-            </Text>
-            <Text className="text-2xl font-bold tracking-tight text-foreground">
-              완료된 이용 내역
-            </Text>
-            <Text className="text-sm text-default-400">
-              종료된 요청 {historyItems.length}건
-            </Text>
-          </View>
-
-          {!isLoading && !error && historyItems.length > 0 ? (
-            <View className="flex-row gap-2">
-              <View className="flex-1 items-center gap-1 rounded-2xl bg-status-completed-bg p-3 dark:bg-status-completed-bg-dark">
-                <Text className="text-lg font-bold text-status-completed dark:text-status-completed-dark">
-                  {completedCount}
-                </Text>
-                <Text className="text-xs text-status-completed dark:text-status-completed-dark">
-                  완료
-                </Text>
-              </View>
-              <View className="flex-1 items-center gap-1 rounded-2xl bg-status-cancelled-bg p-3 dark:bg-status-cancelled-bg-dark">
-                <Text className="text-lg font-bold text-status-cancelled dark:text-status-cancelled-dark">
-                  {cancelledCount}
-                </Text>
-                <Text className="text-xs text-status-cancelled dark:text-status-cancelled-dark">
-                  취소
-                </Text>
-              </View>
-              <View className="flex-1 items-center gap-1 rounded-2xl bg-status-unavailable-bg p-3 dark:bg-status-unavailable-bg-dark">
-                <Text className="text-lg font-bold text-status-unavailable dark:text-status-unavailable-dark">
-                  {unavailableCount}
-                </Text>
-                <Text className="text-xs text-status-unavailable dark:text-status-unavailable-dark">
-                  지원 불가
-                </Text>
-              </View>
-            </View>
-          ) : null}
-
-          {isLoading ? <LoadingView label="이용 내역을 불러오고 있어요" /> : null}
-          {error ? (
-            <ErrorView
-              title="이용 내역을 불러오지 못했어요"
-              onRetry={() => {
-                void refetch();
-              }}
-            />
-          ) : null}
-          {!isLoading && !error && historyItems.length === 0 ? (
-            <EmptyView
-              title="아직 종료된 요청이 없어요"
-              description="진행 중인 요청은 홈 화면에서 확인할 수 있어요."
-            />
-          ) : null}
-
-          <View className="gap-3">
-            {historyItems.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => router.push(`/(app)/support/${item.id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.origin_station_name}에서 ${item.destination_station_name}, ${formatDateTime(item.created_at)}`}
-              >
-                <Card className="rounded-2xl">
-                  <Card.Body className="gap-3 p-4">
-                    <View className="flex-row items-start justify-between gap-3">
-                      <View className="flex-1 gap-1">
-                        <Text className="text-base font-semibold text-foreground">
-                          {item.origin_station_name}{' '}
-                          <Text className="text-default-300">→</Text>{' '}
-                          {item.destination_station_name}
-                        </Text>
-                        <Text className="text-xs text-default-400">
-                          {formatDateTime(item.created_at)}
-                        </Text>
-                      </View>
-                      <StatusChip status={item.status} size="sm" />
-                    </View>
-                    <Separator />
-                    <View className="flex-row items-center justify-between gap-3">
-                      <Text className="flex-1 text-xs text-default-400">
-                        {item.support_types
-                          .map((type) => SUPPORT_TYPE_LABELS[type])
-                          .join(', ')}
-                      </Text>
-                      <Text className="text-xs text-default-300">
-                        {item.id}
-                      </Text>
-                    </View>
-                  </Card.Body>
-                </Card>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
+        {count}
+      </Text>
+      <Text style={{ fontSize: 12, color: fg }}>{label}</Text>
     </View>
   );
 }

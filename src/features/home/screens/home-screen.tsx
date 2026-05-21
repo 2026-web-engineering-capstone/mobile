@@ -1,15 +1,29 @@
+/**
+ * 교움 디자인 시안의 승객 홈 화면.
+ *
+ * 인사말 → 가까운 역 카드(네이버 지도 + 노선 뱃지) → 진행 중 요청 카드 → 코랄 CTA →
+ * 즐겨찾기 경로 → 역 시설 안내 + 실시간 도착 정보.
+ */
 import { useMemo } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Button } from 'heroui-native/button';
-import { Card } from 'heroui-native/card';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusChip } from '@/components/ui';
-import { Header } from '@/features/home/components/header';
+import {
+  BellIcon,
+  ChevronRightIcon,
+  GyoumCTA,
+  GyoumCard,
+  LineBadge,
+  PlusIcon,
+  PulseDot,
+  Screen,
+  SectionLabel,
+  StarIcon,
+  StatusChip,
+} from '@/components/ui';
+import { BRAND_TOKENS, RADIUS, getLineMeta, pretendard } from '@/lib/design-tokens';
+import { typo } from '@/lib/typography';
 import { MapSection } from '@/features/home/components/map-section';
-import { StationLineIcon } from '@/features/home/components/station-line-icon';
-import { StationSelector } from '@/features/home/components/station-selector';
 import {
   DEFAULT_STATION,
   STATION_CATALOG,
@@ -17,25 +31,24 @@ import {
 import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
 import { findNearestStation } from '@/features/home/lib/find-nearest-station';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
+import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
 import { LiveArrivalSection } from '@/features/transit/components/live-arrival-section';
 import { LiveFacilitiesSection } from '@/features/transit/components/live-facilities-section';
 import {
-  SUPPORT_REQUEST_STATUS_GUIDES,
+  SUPPORT_REQUEST_STATUS_LABELS,
   TERMINAL_REQUEST_STATUSES,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
 export function HomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: requests = [] } = useSupportRequests(user?.role === 'passenger');
   const { currentLocation } = useCurrentLocation();
+  const favoriteStations = useStationPreferencesStore((s) => s.favoriteStations);
 
   const station = useMemo(() => {
-    if (!currentLocation) {
-      return DEFAULT_STATION;
-    }
+    if (!currentLocation) return DEFAULT_STATION;
     return findNearestStation(currentLocation, STATION_CATALOG) ?? DEFAULT_STATION;
   }, [currentLocation]);
 
@@ -45,97 +58,226 @@ export function HomeScreen() {
       !TERMINAL_REQUEST_STATUSES.includes(request.status),
   );
 
+  const lineMeta = getLineMeta(station.line.label);
+  const userName = user?.name ?? '승객';
+
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1 bg-background"
-        contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={{
-          paddingTop: insets.top + 10,
-          paddingBottom: insets.bottom + 24,
-        }}
-      >
-        <View className="gap-6 px-5">
-          <Header />
-
-          {/* 진행 중인 요청 우선 노출 */}
-          {activeRequest ? (
-            <Pressable
-              onPress={() =>
-                router.push(`/(app)/support/status/${activeRequest.id}`)
-              }
-              accessibilityRole="button"
-              accessibilityLabel="진행 중인 지원 요청 보기"
+    <Screen
+      background="bg"
+      scrollable
+      padded={false}
+      contentStyle={{ paddingTop: 12, paddingHorizontal: 20, gap: 16 }}
+    >
+      <StatusBar style="dark" />
+        {/* 상단 바 */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingVertical: 8,
+          }}
+        >
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: RADIUS.sm,
+              backgroundColor: BRAND_TOKENS.brand,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: BRAND_TOKENS.textOnDark,
+                fontFamily: pretendard('700'),
+                fontWeight: '700',
+                fontSize: 16,
+              }}
             >
-              <Card className="rounded-3xl border-l-4 border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark">
-                <Card.Body className="gap-3 p-5">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-xs font-semibold uppercase tracking-widest text-brand dark:text-brand-dark">
-                      진행 중인 요청
-                    </Text>
-                    <StatusChip status={activeRequest.status} size="sm" />
-                  </View>
-                  <Text className="text-lg font-bold text-foreground">
-                    {activeRequest.origin_station_name}{' '}
-                    <Text className="text-default-300">→</Text>{' '}
-                    {activeRequest.destination_station_name}
-                  </Text>
-                  <Text className="text-sm leading-5 text-default-600">
-                    {SUPPORT_REQUEST_STATUS_GUIDES[activeRequest.status]}
-                  </Text>
-                  <Text className="text-xs font-semibold text-brand dark:text-brand-dark">
-                    상태 자세히 보기 →
-                  </Text>
-                </Card.Body>
-              </Card>
-            </Pressable>
-          ) : null}
-
-          <MapSection station={station} />
-
-          <View className="gap-1">
-            <Text className="text-2xl font-light tracking-tight text-foreground">
-              현재 도움을 요청할 수 있는 역은
-            </Text>
-            <Text className="text-2xl font-light tracking-tight text-foreground">
-              <Text
-                style={{ color: station.line.colors.primary }}
-                className="font-medium"
-              >
-                {station.name}
-              </Text>{' '}
-              입니다.
+              교
             </Text>
           </View>
-
-          <StationLineIcon line={station.line} />
-          <StationSelector
-            currentStation={station.name.replace('역', '')}
-            line={station.line}
-            nextStation={station.next}
-            previousStation={station.previous}
-          />
-
-          <LiveArrivalSection stationName={station.name} />
-
-          <LiveFacilitiesSection stationName={station.name} />
-
-          {/* 주요 CTA */}
-          <View className="mt-2 gap-2">
-            <Button
-              size="lg"
-              className="rounded-2xl bg-brand dark:bg-brand-dark"
-              onPress={() => router.push('/(app)/support/new')}
-            >
-              {activeRequest ? '추가로 새 요청 만들기' : '지금 지원 요청하기'}
-            </Button>
-            <Text className="text-center text-xs text-default-400">
-              출발·도착 역과 지원 유형을 선택해 빠르게 요청할 수 있어요
-            </Text>
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: RADIUS.pill,
+              backgroundColor: BRAND_TOKENS.surfaceAlt,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BellIcon color={BRAND_TOKENS.text} size={20} />
           </View>
         </View>
-      </ScrollView>
-    </View>
+
+        {/* 인사말 */}
+        <View>
+          <Text style={[typo('body-sm'), { color: BRAND_TOKENS.textMuted, marginBottom: 4 }]}>
+            안녕하세요, {userName}님
+          </Text>
+          <Text style={[typo('title'), { color: BRAND_TOKENS.text }]}>
+            지하철 이용에 도움이{'\n'}필요하신가요?
+          </Text>
+        </View>
+
+        {/* 가까운 역 카드 — 인디고 배경 + 네이버 지도 */}
+        <View
+          style={{
+            backgroundColor: BRAND_TOKENS.brand,
+            borderRadius: RADIUS.card,
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: BRAND_TOKENS.brand,
+          }}
+        >
+          <MapSection station={station} />
+          <View style={{ padding: 18 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: BRAND_TOKENS.success,
+                }}
+              />
+              <Text
+                style={[
+                  typo('meta'),
+                  { color: BRAND_TOKENS.textOnDark, opacity: 0.85 },
+                ]}
+              >
+                가장 가까운 역 · 지원 가능
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <LineBadge char={lineMeta.char} color="white" size={36} />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    typo('number-lg'),
+                    { color: BRAND_TOKENS.textOnDark },
+                  ]}
+                >
+                  {station.name}
+                </Text>
+                <Text
+                  style={[
+                    typo('body-sm'),
+                    { color: BRAND_TOKENS.textOnDark, opacity: 0.75 },
+                  ]}
+                >
+                  {station.line.label}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 진행 중 요청 */}
+        {activeRequest ? (
+          <GyoumCard
+            padding={18}
+            accent
+            onPress={() =>
+              router.push(`/(app)/support/status/${activeRequest.id}`)
+            }
+            accessibilityLabel="진행 중인 지원 요청 보기"
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 10,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <PulseDot color={BRAND_TOKENS.accent} />
+                <Text style={[typo('meta'), { color: BRAND_TOKENS.textMuted }]}>
+                  진행 중인 요청
+                </Text>
+              </View>
+              <StatusChip status={activeRequest.status} size="sm" />
+            </View>
+            <Text style={[typo('body-md'), { color: BRAND_TOKENS.text }]}>
+              {activeRequest.origin_station_name} → {activeRequest.destination_station_name}
+            </Text>
+            <Text style={[typo('meta'), { color: BRAND_TOKENS.textMuted, marginTop: 4 }]}>
+              {SUPPORT_REQUEST_STATUS_LABELS[activeRequest.status]} · 자세히 보기
+            </Text>
+          </GyoumCard>
+        ) : null}
+
+        {/* CTA */}
+        <View style={{ marginTop: 8 }}>
+          <GyoumCTA
+            variant="accent"
+            onPress={() => router.push('/(app)/support/new')}
+            leadingIcon={<PlusIcon color={BRAND_TOKENS.textOnDark} size={20} />}
+          >
+            교통지원 요청하기
+          </GyoumCTA>
+        </View>
+
+        {/* 즐겨찾는 경로 */}
+        {favoriteStations.length > 0 ? (
+          <View>
+            <SectionLabel>즐겨찾는 역</SectionLabel>
+            <View style={{ gap: 8 }}>
+              {favoriteStations.slice(0, 3).map((fav) => (
+                <GyoumCard
+                  key={fav.id}
+                  padding={14}
+                  onPress={() => router.push('/(app)/stations/favorites')}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: RADIUS.sm,
+                        backgroundColor: BRAND_TOKENS.accentLight,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <StarIcon color={BRAND_TOKENS.accent} filled size={20} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typo('body-md'), { color: BRAND_TOKENS.text }]}>
+                        {fav.name}
+                      </Text>
+                      <Text style={[typo('meta'), { color: BRAND_TOKENS.textMuted }]}>
+                        {fav.line}
+                      </Text>
+                    </View>
+                    <ChevronRightIcon color={BRAND_TOKENS.textMuted} size={20} />
+                  </View>
+                </GyoumCard>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* 실시간 도착 */}
+        <LiveArrivalSection stationName={station.name} />
+
+        {/* 역 시설 */}
+        <View>
+          <SectionLabel>역 시설 안내</SectionLabel>
+          <LiveFacilitiesSection stationName={station.name} />
+        </View>
+    </Screen>
   );
 }

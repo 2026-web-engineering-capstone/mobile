@@ -1,10 +1,12 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Button } from 'heroui-native/button';
-import { Card } from 'heroui-native/card';
-import { Separator } from 'heroui-native/separator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import {
+  GyoumCard,
+  GyoumCTA,
+} from '@/components/ui/gyoum-primitives';
+import { Screen } from '@/components/ui/screen';
 import { useAuth } from '@/providers/auth-provider';
 
 type MenuItem = {
@@ -45,103 +47,175 @@ const ROLE_LABELS = {
 export function ProfileScreen() {
   const router = useRouter();
   const { role, user, signOut } = useAuth();
-  const insets = useSafeAreaInsets();
   const displayName = user?.name ?? '교움 사용자';
   const displayEmail = user?.email ?? 'demo@gyoum.kr';
   const avatarInitial = displayName.slice(0, 1);
 
   return (
-    <View className="flex-1 bg-background">
+    <Screen scrollable padded>
       <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 24,
-        }}
-      >
-        <View className="gap-6 px-5">
-          {/* 프로필 헤더 */}
-          <Card className="rounded-2xl bg-brand-surface dark:bg-brand-surface-dark">
-            <Card.Body className="flex-row items-center gap-4 p-5">
-              <View className="h-16 w-16 items-center justify-center rounded-full bg-brand dark:bg-brand-dark">
-                <Text className="text-2xl font-bold text-white">
-                  {avatarInitial}
-                </Text>
-              </View>
-              <View className="flex-1 gap-1">
-                <Text className="text-xl font-bold text-foreground">
-                  {displayName}
-                </Text>
-                <Text className="text-sm text-default-500">
-                  {ROLE_LABELS[role]} · {displayEmail}
-                </Text>
-                {user?.station_id ? (
-                  <Text className="text-xs text-default-400">
-                    소속 역: {user.station_id}
-                  </Text>
-                ) : null}
-              </View>
-            </Card.Body>
-          </Card>
-
-          {/* 메뉴 */}
-          <Card className="rounded-2xl">
-            <Card.Body className="p-0">
-              {MENU_ITEMS.map((item, index) => (
-                <View key={item.title}>
-                  {index > 0 ? <Separator /> : null}
-                  <Pressable
-                    className="flex-row items-center gap-4 px-5 py-4"
-                    onPress={() => router.push(item.route as never)}
-                  >
-                    <View className="h-10 w-10 items-center justify-center rounded-xl bg-default-100">
-                      <Text className="text-lg">{item.icon}</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-sm font-semibold text-foreground">
-                        {item.title}
-                      </Text>
-                      <Text className="text-xs text-default-400">
-                        {item.desc}
-                      </Text>
-                    </View>
-                    <Text className="text-default-300">›</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </Card.Body>
-          </Card>
-
-          {/* 앱 정보 */}
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-2 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-default-400">
-                앱 정보
-              </Text>
-              <View className="flex-row items-center justify-between py-1">
-                <Text className="text-sm text-default-500">버전</Text>
-                <Text className="text-sm text-default-400">0.1.0</Text>
-              </View>
-              <View className="flex-row items-center justify-between py-1">
-                <Text className="text-sm text-default-500">환경</Text>
-                <Text className="text-sm text-default-400">
-                  데모 (API 미연동)
-                </Text>
-              </View>
-            </Card.Body>
-          </Card>
-
-          <Button
-            size="lg"
-            variant="danger-soft"
-            className="rounded-xl"
-            onPress={signOut}
+      <View style={{ gap: 24 }}>
+        <GyoumCard padding={20} style={{ backgroundColor: BRAND_TOKENS.brandSubtle }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 16,
+            }}
           >
-            로그아웃
-          </Button>
-        </View>
-      </ScrollView>
-    </View>
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 32,
+                backgroundColor: BRAND_TOKENS.brand,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: pretendard('700'),
+                  fontWeight: '700',
+                  fontSize: 24,
+                  color: BRAND_TOKENS.onBrand100,
+                }}
+              >
+                {avatarInitial}
+              </Text>
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text
+                style={{
+                  fontFamily: pretendard('700'),
+                  fontWeight: '700',
+                  fontSize: 20,
+                  color: BRAND_TOKENS.text,
+                }}
+              >
+                {displayName}
+              </Text>
+              <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMid }}>
+                {ROLE_LABELS[role]} · {displayEmail}
+              </Text>
+              {user?.station_id ? (
+                <Text style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}>
+                  소속 역: {user.station_id}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        </GyoumCard>
+
+        <GyoumCard padding={0}>
+          {MENU_ITEMS.map((item, index) => (
+            <View key={item.title}>
+              {index > 0 ? (
+                <View
+                  style={{
+                    height: 1,
+                    backgroundColor: BRAND_TOKENS.border,
+                    marginHorizontal: 20,
+                  }}
+                />
+              ) : null}
+              <Pressable
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 16,
+                  paddingHorizontal: 20,
+                  paddingVertical: 16,
+                }}
+                onPress={() => router.push(item.route as never)}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: RADIUS.sm,
+                    backgroundColor: BRAND_TOKENS.surfaceAlt,
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>{item.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontFamily: pretendard('600'),
+                      fontWeight: '600',
+                      fontSize: 14,
+                      color: BRAND_TOKENS.text,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}
+                  >
+                    {item.desc}
+                  </Text>
+                </View>
+                <Text style={{ color: BRAND_TOKENS.borderStrong }}>›</Text>
+              </Pressable>
+            </View>
+          ))}
+        </GyoumCard>
+
+        <GyoumCard padding={16}>
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{
+                fontFamily: pretendard('600'),
+                fontWeight: '600',
+                fontSize: 12,
+                letterSpacing: 0.6,
+                color: BRAND_TOKENS.textMuted,
+              }}
+            >
+              앱 정보
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 4,
+              }}
+            >
+              <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMid }}>
+                버전
+              </Text>
+              <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
+                0.1.0
+              </Text>
+            </View>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 4,
+              }}
+            >
+              <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMid }}>
+                환경
+              </Text>
+              <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
+                데모 (API 미연동)
+              </Text>
+            </View>
+          </View>
+        </GyoumCard>
+
+        <GyoumCTA variant="danger" size="lg" onPress={signOut}>
+          로그아웃
+        </GyoumCTA>
+      </View>
+    </Screen>
   );
 }

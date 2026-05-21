@@ -1,974 +1,793 @@
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+/**
+ * 교움 디자인 시안의 승객 요청 상태 화면.
+ *
+ * 어두운 요약 카드 + 현재 단계 펄스 카드 + 타임라인 + 취소 CTA.
+ * Staff 액션(수락/체크리스트/승차완료/완료)은 별도 staff 화면들로 분리.
+ */
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Button } from 'heroui-native/button';
-import { Card } from 'heroui-native/card';
-import { ErrorView, LoadingView, StatusChip } from '@/components/ui';
-import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  MEETING_POINT_LABELS,
-  SUPPORT_TYPE_LABELS,
-} from '@/features/support-request/store/use-request-draft-store';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
+  ArrowRightIcon,
+  BottomBar,
+  CheckIcon,
+  Divider,
+  ErrorView,
+  GyoumAppBar,
+  GyoumCTA,
+  GyoumCard,
+  LineBadge,
+  LoadingView,
+  PageTitle,
+  PulseDot,
+  Screen,
+  SectionLabel,
+  StatusChip,
+} from '@/components/ui';
+import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getLineMeta } from '@/lib/design-tokens';
+import { ApiError } from '@/lib/api/client';
+import { useAuth } from '@/providers/auth-provider';
 import {
-  canExposeUnavailableReasonAction,
-  getCurrentLocationSignature,
-  getFailedLocationUploadRetryAfterMs,
-  getNextSuccessfulLocationUpload,
-  getStaleSuccessfulLocationUploadAfterMs,
-  shouldDisableRequestActions,
-  shouldUploadCurrentLocation,
-  type SuccessfulLocationUpload,
-} from '@/features/support-request/screens/request-status-screen.logic';
-import {
-  getNextProgressStatus,
-  useAssignSupportRequest,
   useCancelSupportRequest,
-  useMarkSupportRequestUnavailable,
   useSupportRequest,
-  useUpdateSupportRequestChecklist,
-  useUpdateSupportRequestStatus,
   useUploadSupportRequestCurrentLocation,
 } from '@/features/support-request/hooks/use-support-requests';
+import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
 import {
   canPassengerUploadCurrentLocation,
-  canStaffAssignSupportRequest,
-  canStaffManageSupportRequest,
   canStaffViewSupportRequest,
-  CANCELLABLE_REQUEST_STATUSES,
   CANCEL_REASON_LABELS,
+  CANCELLABLE_REQUEST_STATUSES,
+  getCancelReasonLabel,
   getSupportRequestStatusGuide,
-  STAFF_ORIGIN_PROCESSING_STATUSES,
   SUPPORT_REQUEST_FLOW,
   SUPPORT_REQUEST_STATUS_GUIDES,
   SUPPORT_REQUEST_STATUS_LABELS,
   TERMINAL_REQUEST_STATUSES,
-  UNAVAILABLE_REASON_LABELS,
   type CancelReasonCode,
+  type SupportRequestDetail,
   type SupportRequestStatus,
-  type SupportRequestChecklistDraftItem,
-  type SupportRequestChecklistItem,
-  type UnavailableReasonCode,
 } from '@/features/support-request/types';
-import { useAuth } from '@/providers/auth-provider';
+import { MEETING_POINT_LABELS, SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
 
-function formatTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function formatTime(iso: string | null | undefined) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function getGuideMessage(status: SupportRequestStatus, requestReason?: string | null) {
-  if (requestReason) {
-    return requestReason;
-  }
-
-  return SUPPORT_REQUEST_STATUS_GUIDES[status];
-}
-
-function getErrorMessage() {
-  return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
-}
-
-function toChecklistDraft(
-  items: SupportRequestChecklistItem[],
-): SupportRequestChecklistDraftItem[] {
-  return items.map((item) => ({
-    code: item.code,
-    label: item.label,
-    checked: item.checked,
-  }));
-}
-
-function toggleChecklistItem(
-  items: SupportRequestChecklistDraftItem[],
-  itemCode: string,
-): SupportRequestChecklistDraftItem[] {
-  return items.map((item) =>
-    item.code === itemCode ? { ...item, checked: !item.checked } : item,
-  );
-}
-
-const CANCEL_REASON_OPTIONS = Object.entries(CANCEL_REASON_LABELS) as Array<[
-  CancelReasonCode,
-  string,
-]>;
-const UNAVAILABLE_REASON_OPTIONS = Object.entries(
-  UNAVAILABLE_REASON_LABELS,
-) as Array<[UnavailableReasonCode, string]>;
-
-type LocationUploadAttemptState = {
-  requestId: string;
-  signature: string | null;
-  retryAfterMs: number | null;
+const PROGRESS_DESCRIPTIONS: Record<SupportRequestStatus, string> = {
+  submitted: '출발 역 역무원이 요청을 확인하고 있어요.',
+  assigned: '담당 역무원이 만남 위치로 이동 중입니다.',
+  in_progress: '역무원이 도착했어요. 승강장으로 이동해주세요.',
+  boarded: '하차 역 역무원이 안내를 받았어요.',
+  awaiting_dropoff: '하차 역 역무원이 곧 도착할 열차를 기다리고 있어요.',
+  completed: '안전한 승하차 지원이 완료되었어요. 좋은 하루 되세요!',
+  cancelled: '요청이 취소되었습니다.',
+  unavailable: '현재 요청을 지원할 수 없는 상태입니다.',
 };
 
-export function RequestStatusScreen({ requestId }: { requestId: string }) {
+export function RequestStatusScreen() {
   const router = useRouter();
+  const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const insets = useSafeAreaInsets();
-  const { role, user } = useAuth();
-  const [trainNumberInput, setTrainNumberInput] = useState('');
-  const [trainCarNumberInput, setTrainCarNumberInput] = useState('');
-  const [cancelReasonInput, setCancelReasonInput] = useState<CancelReasonCode | null>(null);
-  const [unavailableReasonInput, setUnavailableReasonInput] =
-    useState<UnavailableReasonCode | null>(null);
-  const [completionNoteInput, setCompletionNoteInput] = useState('');
-  const [checklistItems, setChecklistItems] = useState<
-    SupportRequestChecklistDraftItem[] | null
-  >(null);
-  const [isChecklistDirty, setIsChecklistDirty] = useState(false);
-  const [locationUploadAttempt, setLocationUploadAttempt] =
-    useState<LocationUploadAttemptState>({
-      requestId,
-      signature: null,
-      retryAfterMs: null,
-    });
-  const [hasPassengerLocationConsent, setHasPassengerLocationConsent] =
-    useState(false);
-  const [lastSuccessfulLocationUpload, setLastSuccessfulLocationUpload] =
-    useState<SuccessfulLocationUpload | null>(null);
-  const isChecklistDirtyRef = useRef(false);
-  const activeRequestIdRef = useRef(requestId);
-  activeRequestIdRef.current = requestId;
-  const lastAttemptedLocationSignature =
-    locationUploadAttempt.requestId === requestId
-      ? locationUploadAttempt.signature
-      : null;
-  const failedLocationRetryAfterMs =
-    locationUploadAttempt.requestId === requestId
-      ? locationUploadAttempt.retryAfterMs
-      : null;
-  const { data: request, isLoading, error } = useSupportRequest(requestId);
-  const cancelMutation = useCancelSupportRequest(requestId);
-  const assignMutation = useAssignSupportRequest();
-  const updateChecklistMutation = useUpdateSupportRequestChecklist(requestId);
-  const updateStatusMutation = useUpdateSupportRequestStatus(requestId);
-  const uploadCurrentLocationMutation = useUploadSupportRequestCurrentLocation(requestId);
-  const unavailableMutation = useMarkSupportRequestUnavailable(requestId);
-  const canUploadCurrentLocation = Boolean(
-    request && canPassengerUploadCurrentLocation(request, user),
-  );
-  const isCurrentLocationSharingEnabled =
-    canUploadCurrentLocation && hasPassengerLocationConsent;
-  const {
-    currentLocation,
-    errorMessage: locationErrorMessage,
-    isLoading: isCurrentLocationLoading,
-  } = useCurrentLocation(isCurrentLocationSharingEnabled);
-  const requestChecklistDraft = useMemo(
-    () => (request ? toChecklistDraft(request.checklist_items) : []),
-    [request],
-  );
-  const requestChecklistSignature = JSON.stringify(requestChecklistDraft);
-  const visibleChecklistItems = checklistItems ?? requestChecklistDraft;
-  const visibleChecklistSignature = JSON.stringify(visibleChecklistItems);
-  const hasChecklistChanges =
-    checklistItems !== null && visibleChecklistSignature !== requestChecklistSignature;
+  const { user } = useAuth();
+  const requestQuery = useSupportRequest(requestId);
 
-  useEffect(() => {
-    if (!request || isChecklistDirtyRef.current) {
-      return;
-    }
+  if (requestQuery.isLoading) {
+    return <LoadingView />;
+  }
+  if (requestQuery.isError || !requestQuery.data) {
+    return <ErrorView message={requestQuery.error?.message ?? '요청을 찾을 수 없습니다.'} />;
+  }
 
-    setChecklistItems(requestChecklistDraft);
-  }, [request, requestChecklistDraft]);
+  const request = requestQuery.data;
+  const isPassenger = user?.role === 'passenger' && request.passenger_id === user.id;
+  const isStaffWithAccess = user?.role === 'staff' && canStaffViewSupportRequest(request, user);
 
-  useEffect(() => {
-    setHasPassengerLocationConsent(false);
-    setLocationUploadAttempt({
-      requestId,
-      signature: null,
-      retryAfterMs: null,
-    });
-    setLastSuccessfulLocationUpload(null);
-  }, [requestId]);
-
-  useEffect(() => {
-    const nextSuccessfulLocationUpload = getNextSuccessfulLocationUpload({
-      currentSuccessfulLocationUpload: lastSuccessfulLocationUpload,
-      serverCurrentLocation: request?.current_location ?? null,
-      nowMs: Date.now(),
-    });
-
-    if (nextSuccessfulLocationUpload === lastSuccessfulLocationUpload) {
-      return;
-    }
-
-    setLastSuccessfulLocationUpload(nextSuccessfulLocationUpload);
-
-    if (nextSuccessfulLocationUpload) {
-      setLocationUploadAttempt({
-        requestId,
-        signature: null,
-        retryAfterMs: null,
-      });
-    }
-  }, [lastSuccessfulLocationUpload, requestId, request?.current_location]);
-
-  useEffect(() => {
-    isChecklistDirtyRef.current = hasChecklistChanges;
-
-    if (isChecklistDirty !== hasChecklistChanges) {
-      setIsChecklistDirty(hasChecklistChanges);
-    }
-  }, [hasChecklistChanges, isChecklistDirty]);
-
-  useEffect(() => {
-    if (failedLocationRetryAfterMs === null) {
-      return;
-    }
-
-    const retryDelayMs = Math.max(failedLocationRetryAfterMs - Date.now(), 0);
-    const retryTimer = setTimeout(() => {
-      setLocationUploadAttempt((current) => {
-        if (
-          current.requestId !== requestId ||
-          current.retryAfterMs !== failedLocationRetryAfterMs
-        ) {
-          return current;
-        }
-
-        return {
-          requestId,
-          signature: null,
-          retryAfterMs: null,
-        };
-      });
-    }, retryDelayMs);
-
-    return () => clearTimeout(retryTimer);
-  }, [failedLocationRetryAfterMs, requestId]);
-
-  useEffect(() => {
-    if (!lastSuccessfulLocationUpload) {
-      return;
-    }
-
-    const staleAtMs = getStaleSuccessfulLocationUploadAfterMs(
-      lastSuccessfulLocationUpload.uploadedAtMs,
-    );
-    const staleDelayMs = Math.max(staleAtMs - Date.now(), 0);
-    const staleTimer = setTimeout(() => {
-      setLastSuccessfulLocationUpload((current) => {
-        if (
-          current?.signature !== lastSuccessfulLocationUpload.signature ||
-          current.uploadedAtMs !== lastSuccessfulLocationUpload.uploadedAtMs
-        ) {
-          return current;
-        }
-
-        return null;
-      });
-    }, staleDelayMs);
-
-    return () => clearTimeout(staleTimer);
-  }, [lastSuccessfulLocationUpload]);
-
-  useEffect(() => {
-    if (
-      !shouldUploadCurrentLocation({
-        canUploadCurrentLocation,
-        currentLocation,
-        failedLocationRetryAfterMs,
-        hasPassengerLocationConsent,
-        isUploadPending: uploadCurrentLocationMutation.isPending,
-        lastAttemptedLocationSignature,
-        lastSuccessfulLocationUpload,
-        nowMs: Date.now(),
-      })
-    ) {
-      return;
-    }
-
-    const nextLocation = currentLocation;
-    const signature = getCurrentLocationSignature(nextLocation);
-    if (!nextLocation || !signature) {
-      return;
-    }
-
-    setLocationUploadAttempt({
-      requestId,
-      signature,
-      retryAfterMs: null,
-    });
-    uploadCurrentLocationMutation.mutate(
-      {
-        latitude: nextLocation.latitude,
-        longitude: nextLocation.longitude,
-        accuracy_meters: nextLocation.accuracy_meters ?? null,
-      },
-      {
-        onSuccess: () => {
-          if (activeRequestIdRef.current !== requestId) {
-            return;
-          }
-
-          setLastSuccessfulLocationUpload({
-            signature,
-            uploadedAtMs: Date.now(),
-          });
-          setLocationUploadAttempt({
-            requestId,
-            signature: null,
-            retryAfterMs: null,
-          });
-        },
-        onError: () => {
-          if (activeRequestIdRef.current !== requestId) {
-            return;
-          }
-
-          setLocationUploadAttempt({
-            requestId,
-            signature,
-            retryAfterMs: getFailedLocationUploadRetryAfterMs(Date.now()),
-          });
-        },
-      },
-    );
-  }, [
-    canUploadCurrentLocation,
-    currentLocation,
-    failedLocationRetryAfterMs,
-    hasPassengerLocationConsent,
-    lastAttemptedLocationSignature,
-    lastSuccessfulLocationUpload,
-    requestId,
-    uploadCurrentLocationMutation,
-  ]);
-
-  if (isLoading) {
+  // staff는 요청 상세를 staff-detail로 보낸다.
+  if (user?.role === 'staff' && isStaffWithAccess) {
     return (
-      <View className="flex-1 bg-background">
-        <StatusBar style="auto" />
-        <View
-          className="flex-1 items-center justify-center px-6"
-          style={{ paddingTop: insets.top }}
-        >
-          <LoadingView label="지원 상태를 불러오고 있어요" />
-        </View>
-      </View>
+      <Screen background="bg" padded={false} edges={[]}>
+        <GyoumAppBar
+          title="요청 상세"
+          topInset={insets.top}
+          onBack={() => router.back()}
+        />
+        <PassengerLikeBody insets={insets} request={request} hideCancel />
+      </Screen>
     );
   }
 
-  if (error || !request) {
-    return (
-      <View className="flex-1 bg-background">
-        <StatusBar style="auto" />
-        <View
-          className="flex-1 items-center justify-center px-6"
-          style={{ paddingTop: insets.top }}
-        >
-          <ErrorView
-            title="지원 상태를 불러오지 못했어요"
-            message="잠시 후 다시 시도해 주세요."
-            onRetry={() => router.back()}
-          />
-        </View>
-      </View>
-    );
+  if (!isPassenger) {
+    return <ErrorView message="요청을 볼 권한이 없습니다." />;
   }
-
-  const currentIndex = SUPPORT_REQUEST_FLOW.indexOf(request.status);
-  const isFlowStatus = currentIndex !== -1;
-  const nextStatus = getNextProgressStatus(request.status);
-  const isPassenger = role === 'passenger';
-  const isPassengerOwner = request.passenger_id === user?.id;
-  const canViewRequest =
-    (isPassenger && isPassengerOwner) ||
-    canStaffViewSupportRequest(request, user);
-  const canCancel =
-    isPassenger &&
-    isPassengerOwner &&
-    CANCELLABLE_REQUEST_STATUSES.includes(request.status);
-  const canAssign = canStaffAssignSupportRequest(request, user);
-  const canManageRequest = canStaffManageSupportRequest(request, user);
-  const requiresTrainCarInput =
-    nextStatus === 'boarded' && !request.train_car_number;
-  const requiresTrainNumberInput =
-    nextStatus === 'boarded' && !request.train_number;
-  const requiresCompletionNote = nextStatus === 'completed';
-  const hasValidTrainCarInput = /^\d{1,2}$/.test(trainCarNumberInput.trim());
-  const hasValidTrainNumberInput = trainNumberInput.trim().length > 0;
-  const hasValidCancelReason = cancelReasonInput !== null;
-  const hasValidUnavailableReason = unavailableReasonInput !== null;
-  const hasValidCompletionNote = completionNoteInput.trim().length > 0;
-  const canAdvance =
-    canManageRequest &&
-    nextStatus !== null &&
-    !TERMINAL_REQUEST_STATUSES.includes(request.status);
-  const canMarkUnavailable = canExposeUnavailableReasonAction({
-    canManageRequest,
-    requestStatus: request.status,
-    unavailableActionStatuses: STAFF_ORIGIN_PROCESSING_STATUSES,
-  });
-  const canEditChecklist = canManageRequest;
-  const mutationError =
-    cancelMutation.error ??
-    assignMutation.error ??
-    updateChecklistMutation.error ??
-    updateStatusMutation.error ??
-    unavailableMutation.error;
-  const locationUploadError = uploadCurrentLocationMutation.error;
-  const locationSharingStatus = hasPassengerLocationConsent
-    ? request.current_location
-      ? '최근 위치를 공유했습니다.'
-      : currentLocation
-        ? '현재 위치 공유가 활성화되었습니다.'
-        : null
-    : request.current_location
-      ? '이 요청에 최근 공유된 위치가 있습니다. 새 위치 공유는 버튼을 누른 뒤 시작됩니다.'
-      : null;
-  const isMutating = shouldDisableRequestActions({
-    isCancelPending: cancelMutation.isPending,
-    isAssignPending: assignMutation.isPending,
-    isChecklistPending: updateChecklistMutation.isPending,
-    isStatusPending: updateStatusMutation.isPending,
-    isUnavailablePending: unavailableMutation.isPending,
-  });
-
-  const currentGuide = getSupportRequestStatusGuide(request);
-
-  if (!canViewRequest) {
-    return <Redirect href="/(app)/(tabs)" />;
-  }
-
-  const handleAdvance = () => {
-    if (!nextStatus) {
-      return;
-    }
-
-    if (nextStatus === 'boarded') {
-      if (!request.train_car_number && !hasValidTrainCarInput) {
-        return;
-      }
-      if (!request.train_number && !hasValidTrainNumberInput) {
-        return;
-      }
-    }
-
-    if (nextStatus === 'completed' && !hasValidCompletionNote) {
-      return;
-    }
-
-    updateStatusMutation.mutate({
-      status: nextStatus,
-      trainNumber:
-        nextStatus === 'boarded'
-          ? request.train_number ?? trainNumberInput.trim()
-          : undefined,
-      trainCarNumber:
-        nextStatus === 'boarded'
-          ? request.train_car_number ?? trainCarNumberInput.trim()
-          : undefined,
-      completionNote: nextStatus === 'completed' ? completionNoteInput.trim() : undefined,
-    });
-  };
-
-  const handleChecklistSave = () => {
-    if (!canEditChecklist || !hasChecklistChanges) {
-      return;
-    }
-
-    updateChecklistMutation.mutate(visibleChecklistItems, {
-      onSuccess: () => {
-        isChecklistDirtyRef.current = false;
-        setIsChecklistDirty(false);
-      },
-    });
-  };
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="auto" />
+    <Screen background="bg" padded={false} edges={[]}>
+      <StatusBar style="dark" />
+      <GyoumAppBar
+        title="진행 상황"
+        topInset={insets.top}
+        onBack={() => router.back()}
+        trailing={<StatusChip status={request.status} size="sm" />}
+      />
+      <PassengerLikeBody insets={insets} request={request} />
+    </Screen>
+  );
+}
+
+function PassengerLikeBody({
+  insets,
+  request,
+  hideCancel,
+}: {
+  insets: ReturnType<typeof useSafeAreaInsets>;
+  request: SupportRequestDetail;
+  hideCancel?: boolean;
+}) {
+  const router = useRouter();
+  const cancelMutation = useCancelSupportRequest(request.id);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const showCancel =
+    !hideCancel && CANCELLABLE_REQUEST_STATUSES.includes(request.status);
+  const showCompletedAction =
+    !hideCancel && request.status === 'completed';
+
+  const handleCancel = async (reason: CancelReasonCode) => {
+    setErrorMessage(null);
+    try {
+      await cancelMutation.mutateAsync(reason);
+      setCancelOpen(false);
+    } catch (error) {
+      if (error instanceof ApiError) setErrorMessage(error.message);
+      else setErrorMessage('취소에 실패했습니다.');
+    }
+  };
+
+  // 패신저: 현재 위치 자동 업로드 (단순화)
+  usePassengerLocationUpload(request);
+
+  return (
+    <>
       <ScrollView
-        className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 100,
+          paddingHorizontal: 20,
+          paddingTop: 12,
+          paddingBottom: showCancel || showCompletedAction ? 140 : insets.bottom + 32,
+          gap: 16,
         }}
       >
-        <View className="gap-6 px-5">
-          <View className="flex-row items-center justify-between">
-            <View className="gap-1">
-              <Text className="text-2xl font-bold tracking-tight text-foreground">
-                지원 상태
-              </Text>
-              <Text className="text-xs text-default-400">{request.id}</Text>
-            </View>
-            <StatusChip status={request.status} />
-          </View>
+        <SummaryCard request={request} />
+        <CurrentPhaseCard request={request} />
+        <TimelineCard request={request} />
+        <DetailsCard request={request} />
 
-          <Card className="rounded-2xl bg-brand-surface dark:bg-brand-surface-dark">
-            <Card.Body className="gap-2 p-4">
-              <Text className="text-base font-semibold text-foreground">
-                {request.origin_station_name} → {request.destination_station_name}
-              </Text>
-              <Text className="text-sm text-default-500">
-                {request.support_types
-                  .map((type) => SUPPORT_TYPE_LABELS[type])
-                  .join(', ')}{' '}
-                · {MEETING_POINT_LABELS[request.meeting_point]}
-              </Text>
-              <Text className="text-xs text-default-400">
-                담당 역무원: {request.assigned_staff_name ?? '미배정'}
-              </Text>
-            </Card.Body>
-          </Card>
-
-          {isFlowStatus ? (
-            <View className="gap-0">
-              {SUPPORT_REQUEST_FLOW.map((status, index) => {
-                const isDone = currentIndex >= index;
-                const isCurrent = request.status === status;
-                const matchedEvent = request.events.find(
-                  (event) => event.to_status === status,
-                );
-                const time = matchedEvent ? formatTime(matchedEvent.created_at) : null;
-                const guide = getGuideMessage(status, matchedEvent?.message ?? null);
-
-                return (
-                  <View key={status} className="flex-row">
-                    <View className="mr-4 w-6 items-center">
-                      <View
-                        className={`h-6 w-6 items-center justify-center rounded-full ${
-                          isCurrent
-                            ? 'bg-brand dark:bg-brand-dark'
-                            : isDone
-                              ? 'bg-brand-soft dark:bg-brand-soft-dark'
-                              : 'border-2 border-default-200 bg-background'
-                        }`}
-                      >
-                        {isDone ? (
-                          <Text className="text-xs font-bold text-white">
-                            {isCurrent ? '●' : '✓'}
-                          </Text>
-                        ) : (
-                          <Text className="text-[10px] text-default-300">
-                            {index + 1}
-                          </Text>
-                        )}
-                      </View>
-                      {index < SUPPORT_REQUEST_FLOW.length - 1 ? (
-                        <View
-                          className={`w-0.5 flex-1 ${isDone ? 'bg-brand-soft dark:bg-brand-soft-dark' : 'bg-default-200'}`}
-                          style={{ minHeight: 40 }}
-                        />
-                      ) : null}
-                    </View>
-
-                    <View
-                      className={`mb-4 flex-1 rounded-xl px-4 py-3 ${
-                        isCurrent ? 'bg-brand-tint dark:bg-brand-tint-dark' : 'bg-default-50'
-                      }`}
-                    >
-                      <View className="flex-row items-center justify-between">
-                        <Text
-                          className={`text-sm font-semibold ${
-                            isDone ? 'text-foreground' : 'text-default-300'
-                          }`}
-                        >
-                          {SUPPORT_REQUEST_STATUS_LABELS[status]}
-                        </Text>
-                        {time ? (
-                          <Text className="text-xs text-default-400">{time}</Text>
-                        ) : null}
-                      </View>
-                      <Text
-                        className={`mt-1 text-xs leading-4 ${
-                          isDone ? 'text-default-500' : 'text-default-300'
-                        }`}
-                      >
-                        {guide}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          ) : (
-            <Card className="rounded-2xl border border-default-200 bg-default-50">
-              <Card.Body className="gap-2 p-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  {SUPPORT_REQUEST_STATUS_LABELS[request.status]}
-                </Text>
-                <Text className="text-sm leading-5 text-default-500">
-                  {currentGuide}
-                </Text>
-              </Card.Body>
-            </Card>
-          )}
-
-          <Separator />
-
-          {mutationError ? (
-            <Card className="rounded-2xl border border-danger/30">
-              <Card.Body className="p-4">
-                <Text className="text-sm text-danger">
-                  {getErrorMessage()}
-                </Text>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-2 p-4">
-              <Text className="text-sm font-semibold text-foreground">
-                다음 안내
-              </Text>
-              <Text className="text-sm leading-5 text-default-500">
-                {currentGuide}
-              </Text>
-            </Card.Body>
-          </Card>
-
-          {canUploadCurrentLocation ? (
-            <Card className="rounded-2xl border border-brand/20 dark:border-brand-dark/20">
-              <Card.Body className="gap-3 p-4">
-                <Text className="text-sm font-semibold text-brand dark:text-brand-dark">
-                  현재 위치 공유
-                </Text>
-                <Text className="text-sm leading-5 text-default-500">
-                  {hasPassengerLocationConsent
-                    ? '위치 공유를 시작했습니다. 요청이 접수, 배정, 지원 중일 때만 현재 위치가 역무원에게 전송됩니다.'
-                    : '위치 공유는 버튼을 누른 뒤에만 시작됩니다. 시작 후에는 요청이 접수, 배정, 지원 중일 때만 현재 위치가 역무원에게 전송됩니다.'}
-                </Text>
-                {!hasPassengerLocationConsent ? (
-                  <Button
-                    size="sm"
-                    className="self-start rounded-xl bg-brand dark:bg-brand-dark"
-                    onPress={() => setHasPassengerLocationConsent(true)}
-                  >
-                    위치 공유 시작
-                  </Button>
-                ) : null}
-                {locationSharingStatus ? (
-                  <Text className="text-xs text-default-400">
-                    {locationSharingStatus}
-                  </Text>
-                ) : null}
-                {isCurrentLocationLoading ? (
-                  <Text className="text-xs text-default-400">현재 위치를 확인하고 있습니다.</Text>
-                ) : null}
-                {locationErrorMessage ? (
-                  <Text className="text-xs text-danger">{locationErrorMessage}</Text>
-                ) : null}
-                {hasPassengerLocationConsent && locationUploadError ? (
-                  <Text className="text-xs text-danger">
-                    현재 위치 공유에 실패했습니다. 잠시 후 다시 시도합니다.
-                  </Text>
-                ) : null}
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {request.checklist_items.length > 0 ? (
-            <Card className="rounded-2xl">
-              <Card.Body className="gap-3 p-4">
-                <View className="flex-row items-center justify-between gap-3">
-                  <View className="flex-1 gap-1">
-                    <Text className="text-sm font-semibold text-foreground">
-                      지원 체크리스트
-                    </Text>
-                    <Text className="text-xs leading-4 text-default-400">
-                      지원 유형에 맞는 준비 항목을 확인해주세요.
-                    </Text>
-                  </View>
-                  {canEditChecklist ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="rounded-xl"
-                      isDisabled={isMutating || !hasChecklistChanges}
-                      onPress={handleChecklistSave}
-                    >
-                      저장
-                    </Button>
-                  ) : null}
-                </View>
-
-                <View className="gap-2">
-                  {visibleChecklistItems.map((item) => (
-                    <Pressable
-                      key={item.code}
-                      accessibilityRole={canEditChecklist ? 'checkbox' : undefined}
-                      accessibilityState={{ checked: item.checked }}
-                      className={`flex-row items-center gap-3 rounded-xl border px-3 py-3 ${
-                        item.checked
-                          ? 'border-brand-soft bg-brand-tint dark:border-brand-soft-dark dark:bg-brand-tint-dark'
-                          : 'border-default-200 bg-default-50'
-                      }`}
-                      disabled={!canEditChecklist || isMutating}
-                      onPress={() => {
-                        isChecklistDirtyRef.current = true;
-                        setIsChecklistDirty(true);
-                        setChecklistItems((current) =>
-                          toggleChecklistItem(current ?? requestChecklistDraft, item.code),
-                        );
-                      }}
-                    >
-                      <View
-                        className={`h-5 w-5 items-center justify-center rounded-full border ${
-                          item.checked
-                            ? 'border-brand bg-brand dark:border-brand-dark dark:bg-brand-dark'
-                            : 'border-default-300 bg-background'
-                        }`}
-                      >
-                        {item.checked ? (
-                          <Text className="text-[10px] font-bold text-white">✓</Text>
-                        ) : null}
-                      </View>
-                      <Text
-                        className={`flex-1 text-sm ${
-                          item.checked
-                            ? 'font-medium text-foreground'
-                            : 'text-default-600'
-                        }`}
-                      >
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {requiresTrainNumberInput || requiresTrainCarInput ? (
-            <Card className="rounded-2xl">
-              <Card.Body className="gap-4 p-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  탑승 열차 정보
-                </Text>
-                <Text className="text-xs text-default-400">
-                  하차 역에 자동 공유돼요. 열차 번호와 칸 번호 모두 입력해야
-                  승차 완료 처리가 가능합니다.
-                </Text>
-
-                {requiresTrainNumberInput ? (
-                  <View className="gap-1.5">
-                    <Text className="text-xs font-semibold text-default-500">
-                      열차 번호
-                    </Text>
-                    <TextInput
-                      className="rounded-xl bg-default-100 px-4 py-3 text-base text-foreground"
-                      style={{ minHeight: 44 }}
-                      maxLength={16}
-                      placeholder="예: 4567 또는 K1234"
-                      placeholderTextColor={undefined}
-                      value={trainNumberInput}
-                      onChangeText={setTrainNumberInput}
-                      autoCapitalize="characters"
-                      accessibilityLabel="열차 번호 입력"
-                    />
-                  </View>
-                ) : null}
-
-                {requiresTrainCarInput ? (
-                  <View className="gap-1.5">
-                    <Text className="text-xs font-semibold text-default-500">
-                      칸 번호
-                    </Text>
-                    <TextInput
-                      className="rounded-xl bg-default-100 px-4 py-3 text-base text-foreground"
-                      style={{ minHeight: 44 }}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                      placeholder="예: 4"
-                      placeholderTextColor={undefined}
-                      value={trainCarNumberInput}
-                      onChangeText={(value) =>
-                        setTrainCarNumberInput(value.replace(/[^0-9]/g, ''))
-                      }
-                      accessibilityLabel="열차 칸 번호 입력"
-                    />
-                  </View>
-                ) : null}
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {requiresCompletionNote && canAdvance ? (
-            <Card className="rounded-2xl">
-              <Card.Body className="gap-3 p-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  완료 메모 입력
-                </Text>
-                <TextInput
-                  className="min-h-[96px] rounded-xl bg-default-100 px-4 py-3 text-sm text-foreground"
-                  multiline
-                  placeholder="지원 완료 내용을 입력해주세요"
-                  placeholderTextColor={undefined}
-                  textAlignVertical="top"
-                  value={completionNoteInput}
-                  onChangeText={setCompletionNoteInput}
-                />
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {canMarkUnavailable ? (
-            <Card className="rounded-2xl">
-              <Card.Body className="gap-3 p-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  지원 불가 사유
-                </Text>
-                <View className="gap-2">
-                  {UNAVAILABLE_REASON_OPTIONS.map(([reasonCode, label]) => {
-                    const isSelected = unavailableReasonInput === reasonCode;
-
-                    return (
-                      <Pressable
-                        key={reasonCode}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: isSelected }}
-                        className={`rounded-xl border px-4 py-3 ${
-                          isSelected
-                            ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark'
-                            : 'border-default-200 bg-default-50'
-                        }`}
-                        disabled={isMutating}
-                        onPress={() => setUnavailableReasonInput(reasonCode)}
-                      >
-                        <Text
-                          className={`text-sm ${
-                            isSelected ? 'font-semibold text-foreground' : 'text-default-600'
-                          }`}
-                        >
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {canCancel ? (
-            <Card className="rounded-2xl">
-              <Card.Body className="gap-3 p-4">
-                <Text className="text-sm font-semibold text-foreground">
-                  취소 사유
-                </Text>
-                <View className="gap-2">
-                  {CANCEL_REASON_OPTIONS.map(([reasonCode, label]) => {
-                    const isSelected = cancelReasonInput === reasonCode;
-
-                    return (
-                      <Pressable
-                        key={reasonCode}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: isSelected }}
-                        className={`rounded-xl border px-4 py-3 ${
-                          isSelected
-                            ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark'
-                            : 'border-default-200 bg-default-50'
-                        }`}
-                        disabled={isMutating}
-                        onPress={() => setCancelReasonInput(reasonCode)}
-                      >
-                        <Text
-                          className={`text-sm ${
-                            isSelected ? 'font-semibold text-foreground' : 'text-default-600'
-                          }`}
-                        >
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </Card.Body>
-            </Card>
-          ) : null}
-        </View>
-      </ScrollView>
-
-      <View
-        className="gap-3 border-t border-default-100 bg-background px-5 pt-3"
-        style={{ paddingBottom: insets.bottom + 12 }}
-      >
-        {canAssign ? (
-          <Button
-            size="lg"
-            className="rounded-xl bg-brand dark:bg-brand-dark"
-            isDisabled={isMutating}
-            onPress={() => assignMutation.mutate(request.id)}
-          >
-            내가 배정받기
-          </Button>
-        ) : null}
-
-        {canAdvance && nextStatus ? (
-          <Button
-            size="lg"
-            className="rounded-xl bg-brand dark:bg-brand-dark"
-            isDisabled={
-              isMutating ||
-              (requiresTrainCarInput && !hasValidTrainCarInput) ||
-              (requiresCompletionNote && !hasValidCompletionNote)
-            }
-            onPress={handleAdvance}
-          >
-            다음 단계: {SUPPORT_REQUEST_STATUS_LABELS[nextStatus]}
-          </Button>
-        ) : null}
-
-        {canMarkUnavailable ? (
-          <Button
-            size="lg"
-            variant="secondary"
-            className="rounded-xl"
-            isDisabled={isMutating || !hasValidUnavailableReason}
-            onPress={() => {
-              if (!unavailableReasonInput) {
-                return;
-              }
-              unavailableMutation.mutate(unavailableReasonInput);
+        {errorMessage ? (
+          <View
+            style={{
+              padding: 14,
+              borderRadius: 14,
+              backgroundColor: BRAND_TOKENS.dangerBg,
+              borderWidth: 1,
+              borderColor: BRAND_TOKENS.danger + '40',
             }}
           >
-            지원 불가 처리
-          </Button>
+            <Text style={{ fontFamily: FONT_FAMILY, color: BRAND_TOKENS.danger, fontSize: 13 }}>
+              {errorMessage}
+            </Text>
+          </View>
         ) : null}
 
-        <View className="flex-row gap-3">
-          {canCancel ? (
-            <Button
-              size="lg"
-              variant="danger-soft"
-              className="flex-1 rounded-xl"
-              isDisabled={isMutating || !hasValidCancelReason}
-              onPress={() => {
-                if (!cancelReasonInput) {
-                  return;
-                }
-                cancelMutation.mutate(cancelReasonInput);
-              }}
+        {cancelOpen ? (
+          <GyoumCard padding={16}>
+            <SectionLabel>취소 사유</SectionLabel>
+            <View style={{ gap: 8 }}>
+              {(Object.entries(CANCEL_REASON_LABELS) as [CancelReasonCode, string][]).map(
+                ([code, label]) => (
+                  <Pressable
+                    key={code}
+                    onPress={() => handleCancel(code)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      borderRadius: 12,
+                      backgroundColor: BRAND_TOKENS.surfaceAlt,
+                      borderWidth: 1,
+                      borderColor: BRAND_TOKENS.border,
+                    }}
+                  >
+                    <Text
+                      style={{ fontFamily: FONT_FAMILY, fontSize: 14, color: BRAND_TOKENS.text }}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+          </GyoumCard>
+        ) : null}
+      </ScrollView>
+
+      {(showCancel || showCompletedAction) && !hideCancel ? (
+        <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+          {showCancel ? (
+            <GyoumCTA
+              variant="ghost"
+              onPress={() => setCancelOpen((open) => !open)}
+              disabled={cancelMutation.isPending}
             >
-              요청 취소
-            </Button>
-          ) : null}
-          <Button
-            size="lg"
-            className="rounded-xl bg-brand dark:bg-brand-dark"
-            isDisabled={isMutating}
-            onPress={() => router.back()}
-            style={canCancel ? { flex: 1 } : undefined}
+              {cancelOpen ? '닫기' : '요청 취소하기'}
+            </GyoumCTA>
+          ) : (
+            <GyoumCTA
+              variant="primary"
+              onPress={() => router.replace('/(app)/(tabs)')}
+            >
+              완료
+            </GyoumCTA>
+          )}
+        </BottomBar>
+      ) : null}
+    </>
+  );
+}
+
+function SummaryCard({ request }: { request: SupportRequestDetail }) {
+  const showTrainInfo = ['boarded', 'awaiting_dropoff', 'completed'].includes(
+    request.status,
+  );
+  return (
+    <GyoumCard
+      padding={18}
+      style={{
+        backgroundColor: BRAND_TOKENS.text,
+        borderColor: BRAND_TOKENS.text,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 14,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 12,
+            color: BRAND_TOKENS.onBrand60,
+          }}
+        >
+          요청 번호 #{request.id.slice(-6).toUpperCase()}
+        </Text>
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 12,
+            color: BRAND_TOKENS.onBrand60,
+          }}
+        >
+          {formatTime(request.created_at)}
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <View>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 11,
+              color: BRAND_TOKENS.onBrand60,
+              marginBottom: 2,
+            }}
           >
-            확인
-          </Button>
+            출발
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 16,
+              color: BRAND_TOKENS.textOnDark,
+              fontWeight: '600',
+            }}
+          >
+            {request.origin_station_name}
+          </Text>
         </View>
+        <ArrowRightIcon color={BRAND_TOKENS.onBrand70} size={20} />
+        <View>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 11,
+              color: BRAND_TOKENS.onBrand60,
+              marginBottom: 2,
+            }}
+          >
+            도착
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 16,
+              color: BRAND_TOKENS.textOnDark,
+              fontWeight: '600',
+            }}
+          >
+            {request.destination_station_name}
+          </Text>
+        </View>
+      </View>
+      {showTrainInfo && request.train_number ? (
+        <View
+          style={{
+            marginTop: 14,
+            paddingTop: 14,
+            borderTopWidth: 1,
+            borderTopColor: BRAND_TOKENS.onBrand15,
+            flexDirection: 'row',
+            gap: 16,
+          }}
+        >
+          <Stat label="열차 번호" value={request.train_number} />
+          {request.train_car_number ? (
+            <Stat label="칸 번호" value={request.train_car_number} />
+          ) : null}
+        </View>
+      ) : null}
+    </GyoumCard>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 10,
+          color: BRAND_TOKENS.onBrand55,
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{ fontFamily: FONT_FAMILY, fontSize: 16, color: BRAND_TOKENS.textOnDark, fontWeight: '700' }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function CurrentPhaseCard({ request }: { request: SupportRequestDetail }) {
+  if (request.status === 'completed') {
+    return (
+      <GyoumCard
+        padding={18}
+        style={{
+          backgroundColor: BRAND_TOKENS.successBg,
+          borderColor: BRAND_TOKENS.success,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            marginBottom: 6,
+          }}
+        >
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: BRAND_TOKENS.success,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <CheckIcon color={BRAND_TOKENS.textOnDark} size={18} />
+          </View>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 17,
+              fontWeight: '700',
+              color: BRAND_TOKENS.success,
+            }}
+          >
+            안전하게 도착했어요
+          </Text>
+        </View>
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 14,
+            color: BRAND_TOKENS.textMid,
+            lineHeight: 21,
+          }}
+        >
+          {request.completion_note ?? PROGRESS_DESCRIPTIONS.completed}
+        </Text>
+      </GyoumCard>
+    );
+  }
+  if (request.status === 'cancelled') {
+    return (
+      <GyoumCard
+        padding={18}
+        style={{ backgroundColor: BRAND_TOKENS.dangerBg, borderColor: BRAND_TOKENS.danger }}
+      >
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 16,
+            fontWeight: '700',
+            color: BRAND_TOKENS.danger,
+            marginBottom: 4,
+          }}
+        >
+          요청이 취소되었습니다
+        </Text>
+        <Text style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: BRAND_TOKENS.textMid }}>
+          {getCancelReasonLabel(request.cancel_reason) ?? '취소 사유가 기록되었습니다.'}
+        </Text>
+      </GyoumCard>
+    );
+  }
+  if (request.status === 'unavailable') {
+    return (
+      <GyoumCard
+        padding={18}
+        style={{ backgroundColor: BRAND_TOKENS.warningBg, borderColor: BRAND_TOKENS.warning }}
+      >
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 16,
+            fontWeight: '700',
+            color: BRAND_TOKENS.warning,
+            marginBottom: 4,
+          }}
+        >
+          현재 지원이 어렵습니다
+        </Text>
+        <Text style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: BRAND_TOKENS.textMid }}>
+          {getSupportRequestStatusGuide(request)}
+        </Text>
+      </GyoumCard>
+    );
+  }
+
+  return (
+    <GyoumCard
+      padding={18}
+      style={{ backgroundColor: BRAND_TOKENS.brandLight, borderColor: BRAND_TOKENS.brand }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 6,
+        }}
+      >
+        <PulseDot />
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 12,
+            color: BRAND_TOKENS.brand,
+            fontWeight: '700',
+            letterSpacing: 0.4,
+          }}
+        >
+          현재 단계
+        </Text>
+      </View>
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 17,
+          fontWeight: '700',
+          color: BRAND_TOKENS.text,
+          marginBottom: 4,
+        }}
+      >
+        {SUPPORT_REQUEST_STATUS_LABELS[request.status]}
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 14,
+          color: BRAND_TOKENS.textMid,
+          lineHeight: 21,
+        }}
+      >
+        {PROGRESS_DESCRIPTIONS[request.status]}
+      </Text>
+    </GyoumCard>
+  );
+}
+
+function TimelineCard({ request }: { request: SupportRequestDetail }) {
+  const currentIdx = SUPPORT_REQUEST_FLOW.indexOf(request.status);
+  const eventByStatus = useMemo(() => {
+    const map = new Map<SupportRequestStatus, string>();
+    for (const ev of request.events) {
+      if (ev.to_status && !map.has(ev.to_status)) map.set(ev.to_status, ev.created_at);
+    }
+    return map;
+  }, [request.events]);
+
+  return (
+    <View>
+      <SectionLabel>진행 이력</SectionLabel>
+      <GyoumCard padding={0}>
+        {SUPPORT_REQUEST_FLOW.map((status, i) => {
+          const state: 'done' | 'active' | 'pending' =
+            i < currentIdx ? 'done' : i === currentIdx ? 'active' : 'pending';
+          return (
+            <TimelineStep
+              key={status}
+              status={status}
+              state={state}
+              isLast={i === SUPPORT_REQUEST_FLOW.length - 1}
+              time={formatTime(eventByStatus.get(status) ?? null)}
+            />
+          );
+        })}
+      </GyoumCard>
+    </View>
+  );
+}
+
+function TimelineStep({
+  status,
+  state,
+  isLast,
+  time,
+}: {
+  status: SupportRequestStatus;
+  state: 'done' | 'active' | 'pending';
+  isLast: boolean;
+  time: string;
+}) {
+  const color =
+    state === 'done'
+      ? BRAND_TOKENS.success
+      : state === 'active'
+        ? BRAND_TOKENS.brand
+        : BRAND_TOKENS.borderStrong;
+  return (
+    <View style={{ flexDirection: 'row', gap: 14, paddingHorizontal: 20, paddingVertical: 14 }}>
+      <View style={{ alignItems: 'center', position: 'relative' }}>
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: state === 'pending' ? BRAND_TOKENS.surface : color,
+            borderWidth: 2,
+            borderColor: color,
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          {state === 'done' ? <CheckIcon color={BRAND_TOKENS.textOnDark} size={12} /> : null}
+          {state === 'active' ? (
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: BRAND_TOKENS.textOnDark,
+              }}
+            />
+          ) : null}
+        </View>
+        {!isLast ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: 24,
+              bottom: -14,
+              width: 2,
+              backgroundColor:
+                state === 'pending' ? BRAND_TOKENS.border : color,
+            }}
+          />
+        ) : null}
+      </View>
+      <View style={{ flex: 1 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 15,
+              fontWeight: state === 'active' ? '700' : '500',
+              color: state === 'pending' ? BRAND_TOKENS.textMuted : BRAND_TOKENS.text,
+            }}
+          >
+            {SUPPORT_REQUEST_STATUS_LABELS[status]}
+          </Text>
+          {time ? (
+            <Text
+              style={{ fontFamily: FONT_FAMILY, fontSize: 12, color: BRAND_TOKENS.textMuted }}
+            >
+              {time}
+            </Text>
+          ) : null}
+        </View>
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 13,
+            color: BRAND_TOKENS.textMid,
+            marginTop: 2,
+            opacity: state === 'pending' ? 0.5 : 1,
+          }}
+        >
+          {SUPPORT_REQUEST_STATUS_GUIDES[status]}
+        </Text>
       </View>
     </View>
   );
+}
+
+function DetailsCard({ request }: { request: SupportRequestDetail }) {
+  const originLine = getLineMeta(request.origin_station_id);
+  const destLine = getLineMeta(request.destination_station_id);
+  return (
+    <View>
+      <SectionLabel>요청 정보</SectionLabel>
+      <GyoumCard padding={0}>
+        <View style={{ padding: 18 }}>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 12,
+              color: BRAND_TOKENS.textMuted,
+              fontWeight: '600',
+              letterSpacing: 0.4,
+              marginBottom: 8,
+            }}
+          >
+            지원 유형
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {request.support_types.map((type) => (
+              <View
+                key={type}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: RADIUS.pill,
+                  backgroundColor: BRAND_TOKENS.brandLight,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: FONT_FAMILY,
+                    fontSize: 13,
+                    color: BRAND_TOKENS.brand,
+                    fontWeight: '500',
+                  }}
+                >
+                  {SUPPORT_TYPE_LABELS[type]}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        <Divider />
+        <View style={{ padding: 18 }}>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 12,
+              color: BRAND_TOKENS.textMuted,
+              fontWeight: '600',
+              letterSpacing: 0.4,
+              marginBottom: 8,
+            }}
+          >
+            만남 위치
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 15,
+              color: BRAND_TOKENS.text,
+              fontWeight: '500',
+            }}
+          >
+            {MEETING_POINT_LABELS[request.meeting_point]}
+          </Text>
+          {request.notes ? (
+            <View
+              style={{
+                marginTop: 8,
+                padding: 10,
+                backgroundColor: BRAND_TOKENS.surfaceAlt,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: BRAND_TOKENS.textMid }}>
+                “{request.notes}”
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {request.assigned_staff_name ? (
+          <>
+            <Divider />
+            <View style={{ padding: 18 }}>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 12,
+                  color: BRAND_TOKENS.textMuted,
+                  fontWeight: '600',
+                  letterSpacing: 0.4,
+                  marginBottom: 8,
+                }}
+              >
+                담당 역무원
+              </Text>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 15,
+                  color: BRAND_TOKENS.text,
+                  fontWeight: '500',
+                }}
+              >
+                {request.assigned_staff_name}
+              </Text>
+            </View>
+          </>
+        ) : null}
+      </GyoumCard>
+    </View>
+  );
+}
+
+// ─── 패신저 GPS 위치 자동 업로드 (단순 폴링) ─────────────
+function usePassengerLocationUpload(request: SupportRequestDetail) {
+  const { user } = useAuth();
+  const { currentLocation } = useCurrentLocation();
+  const uploadMutation = useUploadSupportRequestCurrentLocation(request.id);
+  const lastUploadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!canPassengerUploadCurrentLocation(request, user)) return;
+    if (!currentLocation) return;
+    const signature = `${currentLocation.latitude.toFixed(5)},${currentLocation.longitude.toFixed(5)}`;
+    if (lastUploadRef.current === signature) return;
+    lastUploadRef.current = signature;
+    void uploadMutation.mutateAsync({
+      latitude: currentLocation.latitude,
+      longitude: currentLocation.longitude,
+      accuracy_meters: null,
+    });
+  }, [currentLocation, request, uploadMutation, user]);
 }

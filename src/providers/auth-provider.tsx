@@ -28,7 +28,7 @@ type AuthContextValue = {
   isLoading: boolean;
   role: Role;
   user: SessionUser | null;
-  signIn: (role: Role) => Promise<void>;
+  signIn: (role: Role, options?: { stationId?: string | null }) => Promise<void>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 };
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isLoading,
       role: user?.role ?? 'passenger',
       user,
-      signIn: async (role) => {
+      signIn: async (role, options) => {
         refreshSessionRequestIdRef.current += 1;
         closeRealtimeConnection();
         const installationId = await getPushInstallationId();
@@ -125,6 +125,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             ? Platform.OS
             : undefined;
         const session = await signInApi(role, {
+          stationId: options?.stationId ?? null,
           installationId,
           pushToken: pushToken ?? undefined,
           pushPlatform,

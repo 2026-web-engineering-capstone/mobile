@@ -83,13 +83,13 @@ export type SupportRequestDetail = SupportRequestListItem & {
 };
 
 export const SUPPORT_REQUEST_STATUS_LABELS: Record<SupportRequestStatus, string> = {
-  submitted: '접수',
-  assigned: '배정',
-  in_progress: '지원 중',
+  submitted: '요청 접수',
+  assigned: '담당자 배정',
+  in_progress: '역무원 도착',
   boarded: '승차 완료',
-  awaiting_dropoff: '하차 대기',
-  completed: '완료',
-  cancelled: '취소',
+  awaiting_dropoff: '하차 역 대기',
+  completed: '지원 완료',
+  cancelled: '취소됨',
   unavailable: '지원 불가',
 };
 

@@ -1,339 +1,612 @@
+/**
+ * 교움 디자인 시안의 역무원 큐 화면.
+ *
+ * 어두운 근무지 카드(대기/처리중/완료 stat) + 탭(지원 요청/완료) + 요청 카드.
+ * 요청 카드 누르면 staff-detail로, 5분 이상 대기 시 긴급 뱃지 표시.
+ */
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Card } from 'heroui-native/card';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  BellIcon,
+  CheckIcon,
   EmptyView,
   ErrorView,
+  GyoumAppBar,
+  GyoumCard,
+  LineBadge,
   LoadingView,
+  PinIcon,
+  Screen,
   StatusChip,
+  ArrowRightIcon,
 } from '@/components/ui';
+import { BRAND_TOKENS, FONT_FAMILY, getLineMeta } from '@/lib/design-tokens';
 import {
   MEETING_POINT_LABELS,
   SUPPORT_TYPE_LABELS,
 } from '@/features/support-request/store/use-request-draft-store';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import {
-  getStaffQueueItemClassification,
-  type StaffQueueItemClassification,
-  type StaffQueueItemKind,
+  TERMINAL_REQUEST_STATUSES,
+  type SupportRequestListItem,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
-type FilterId = 'all' | StaffQueueItemKind;
+type Tab = 'incoming' | 'done';
 
-const FILTERS: { id: FilterId; label: string }[] = [
-  { id: 'all', label: '전체' },
-  { id: 'origin_processing', label: '출발역 처리' },
-  { id: 'destination_handoff', label: '하차역 인계' },
-  { id: 'origin_handoff_monitoring', label: '인계 모니터링' },
-];
-
-const SUPPORT_TYPE_EMOJI: Record<string, string> = {
-  wheelchair: '🦽',
-  'visual-guide': '🧑‍🦯',
-  'boarding-ramp': '🪜',
-};
-
-function formatElapsed(createdAt: string): string {
-  const ms = Date.now() - Date.parse(createdAt);
-  if (Number.isNaN(ms) || ms < 0) return '방금';
-  const minutes = Math.floor(ms / 60000);
-  if (minutes < 1) return '방금';
-  if (minutes < 60) return `${minutes}분 전 접수`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전 접수`;
-  const days = Math.floor(hours / 24);
-  return `${days}일 전 접수`;
-}
-
-function primaryActionLabel(
-  status: string,
-  classification: StaffQueueItemClassification,
-): string {
-  if (classification.kind === 'destination_handoff') {
-    if (status === 'boarded') return '하차 대기 확인';
-    if (status === 'awaiting_dropoff') return '하차 지원 완료';
-    return '하차 인계 확인';
-  }
-  if (classification.kind === 'origin_handoff_monitoring') {
-    return '진행 상황 보기';
-  }
-  switch (status) {
-    case 'submitted':
-      return '나에게 배정';
-    case 'assigned':
-      return '지원 시작';
-    case 'in_progress':
-      return '승차 완료 처리';
-    case 'boarded':
-      return '하차 역 인계';
-    case 'awaiting_dropoff':
-      return '하차 지원 완료';
-    default:
-      return '요청 확인';
-  }
+function elapsedMinutes(createdAt: string): number {
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return 0;
+  return Math.max(0, Math.floor((Date.now() - created) / 60000));
 }
 
 export function StaffQueueScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { role, user } = useAuth();
-  const [filterId, setFilterId] = useState<FilterId>('all');
+  const { user } = useAuth();
+  const [tab, setTab] = useState<Tab>('incoming');
+  const requestsQuery = useSupportRequests(user?.role === 'staff');
 
-  const {
-    data = [],
-    isLoading,
-    error,
-    refetch,
-  } = useSupportRequests(role === 'staff');
+  const requests = requestsQuery.data ?? [];
+  const incoming = useMemo(
+    () => requests.filter((r) => !TERMINAL_REQUEST_STATUSES.includes(r.status)),
+    [requests],
+  );
+  const done = useMemo(
+    () => requests.filter((r) => r.status === 'completed'),
+    [requests],
+  );
 
-  const queueItems = useMemo(() => {
-    return data
-      .reduce<
-        Array<{
-          item: (typeof data)[number];
-          classification: StaffQueueItemClassification;
-        }>
-      >((items, item) => {
-        const classification = getStaffQueueItemClassification(item, user);
-        if (classification) {
-          items.push({ item, classification });
-        }
-        return items;
-      }, [])
-      .sort((left, right) => {
-        const priorityDiff =
-          left.classification.sortPriority -
-          right.classification.sortPriority;
-        if (priorityDiff !== 0) return priorityDiff;
-        return (
-          Date.parse(right.item.created_at) -
-          Date.parse(left.item.created_at)
-        );
-      });
-  }, [data, user]);
+  const processingCount = incoming.filter((r) =>
+    ['assigned', 'in_progress', 'boarded', 'awaiting_dropoff'].includes(r.status),
+  ).length;
+  const waitingCount = incoming.filter((r) => r.status === 'submitted').length;
 
-  const filteredItems = useMemo(() => {
-    if (filterId === 'all') return queueItems;
-    return queueItems.filter(
-      (entry) => entry.classification.kind === filterId,
-    );
-  }, [queueItems, filterId]);
-
-  const counts = useMemo(() => {
-    const result: Record<FilterId, number> = {
-      all: queueItems.length,
-      origin_processing: 0,
-      destination_handoff: 0,
-      origin_handoff_monitoring: 0,
-    };
-    for (const entry of queueItems) {
-      result[entry.classification.kind] += 1;
-    }
-    return result;
-  }, [queueItems]);
-
-  if (role !== 'staff') {
-    return <Redirect href="/(app)/(tabs)" />;
+  if (user?.role !== 'staff') {
+    return <ErrorView message="역무원 권한이 필요합니다." />;
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="auto" />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 24,
+    <Screen
+      background="bg"
+      padded={false}
+      edges={['top', 'bottom']}
+      header={
+        <>
+          <StatusBar style="dark" />
+          <GyoumAppBar
+            topInset={0}
+            leading={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 10,
+                backgroundColor: BRAND_TOKENS.brand,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: BRAND_TOKENS.onBrand100,
+                  fontFamily: FONT_FAMILY,
+                  fontWeight: '700',
+                  fontSize: 14,
+                }}
+              >
+                교
+              </Text>
+            </View>
+            <View
+              style={{
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+                backgroundColor: BRAND_TOKENS.text,
+              }}
+            >
+              <Text
+                style={{
+                  color: BRAND_TOKENS.onBrand100,
+                  fontFamily: FONT_FAMILY,
+                  fontWeight: '700',
+                  fontSize: 10,
+                  letterSpacing: 1,
+                }}
+              >
+                STAFF
+              </Text>
+            </View>
+          </View>
+        }
+        trailing={
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: BRAND_TOKENS.surfaceAlt,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BellIcon color={BRAND_TOKENS.text} size={20} />
+          </View>
+        }
+          />
+        </>
+      }
+    >
+      {requestsQuery.isLoading && requests.length === 0 ? (
+        <LoadingView />
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 8,
+            paddingBottom: 32,
+            gap: 16,
+          }}
+        >
+          {/* 근무 정보 카드 (어두운) */}
+          <GyoumCard
+            padding={16}
+            style={{ backgroundColor: BRAND_TOKENS.text, borderColor: BRAND_TOKENS.text }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 12,
+                  color: BRAND_TOKENS.onBrand60,
+                }}
+              >
+                오늘 근무
+              </Text>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 12,
+                  color: BRAND_TOKENS.onBrand60,
+                }}
+              >
+                {user?.name}
+              </Text>
+            </View>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 14,
+              }}
+            >
+              <LineBadge char="역" color="white" size={32} />
+              <View>
+                <Text
+                  style={{
+                    fontFamily: FONT_FAMILY,
+                    fontSize: 18,
+                    fontWeight: '700',
+                    color: BRAND_TOKENS.onBrand100,
+                  }}
+                >
+                  {user?.station_id ? `${user.station_id} 역` : '근무지 미지정'}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: FONT_FAMILY,
+                    fontSize: 12,
+                    color: BRAND_TOKENS.onBrand60,
+                  }}
+                >
+                  역무원 모드
+                </Text>
+              </View>
+            </View>
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 1,
+                backgroundColor: BRAND_TOKENS.onBrand10,
+                borderRadius: 10,
+                overflow: 'hidden',
+              }}
+            >
+              <StatBlock label="대기" value={waitingCount} accent />
+              <StatBlock label="처리 중" value={processingCount} />
+              <StatBlock label="오늘 완료" value={done.length} />
+            </View>
+          </GyoumCard>
+
+          {/* 탭 */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 4,
+              backgroundColor: BRAND_TOKENS.surfaceAlt,
+              padding: 4,
+              borderRadius: 12,
+            }}
+          >
+            <TabButton
+              active={tab === 'incoming'}
+              onPress={() => setTab('incoming')}
+              count={incoming.length}
+            >
+              지원 요청
+            </TabButton>
+            <TabButton active={tab === 'done'} onPress={() => setTab('done')}>
+              완료
+            </TabButton>
+          </View>
+
+          {tab === 'incoming' ? (
+            <View style={{ gap: 10 }}>
+              {incoming.length === 0 ? (
+                <EmptyState text="대기 중인 요청이 없습니다" />
+              ) : (
+                incoming.map((req) => (
+                  <RequestQueueCard
+                    key={req.id}
+                    request={req}
+                    onPress={() => router.push(`/(app)/support/${req.id}`)}
+                  />
+                ))
+              )}
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {done.length === 0 ? (
+                <EmptyState text="오늘 완료된 요청이 없습니다" />
+              ) : (
+                done.map((req) => <DoneCard key={req.id} request={req} />)
+              )}
+            </View>
+          )}
+        </ScrollView>
+      )}
+    </Screen>
+  );
+}
+
+function StatBlock({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        paddingVertical: 10,
+        backgroundColor: '#000',
+        alignItems: 'center',
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 11,
+          color: BRAND_TOKENS.onBrand50,
+          marginBottom: 4,
         }}
       >
-        <View className="gap-4 px-5">
-          {/* 헤더 */}
-          <View className="gap-1">
-            <Text className="text-xs font-semibold uppercase tracking-widest text-brand dark:text-brand-dark">
-              STAFF QUEUE
-            </Text>
-            <Text className="text-2xl font-bold tracking-tight text-foreground">
-              지원 요청 큐
-            </Text>
-            <Text className="text-sm text-default-400">
-              {user?.station_id
-                ? `현재 역 기준으로 처리할 요청을 보여드려요`
-                : '소속 역 정보가 없어 큐를 표시할 수 없어요'}
-            </Text>
-          </View>
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 22,
+          fontWeight: '700',
+          color: accent ? BRAND_TOKENS.accent : BRAND_TOKENS.onBrand100,
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
 
-          {/* 필터 탭 */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
+function TabButton({
+  active,
+  onPress,
+  children,
+  count,
+}: {
+  active: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+  count?: number;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+      }}
+    >
+      <View
+        onTouchEnd={onPress}
+        style={{
+          paddingVertical: 10,
+          borderRadius: 8,
+          backgroundColor: active ? BRAND_TOKENS.surface : 'transparent',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 13,
+            fontWeight: '600',
+            color: active ? BRAND_TOKENS.text : BRAND_TOKENS.textMuted,
+          }}
+        >
+          {children}
+        </Text>
+        {count ? (
+          <View
+            style={{
+              minWidth: 18,
+              height: 18,
+              paddingHorizontal: 6,
+              borderRadius: 9,
+              backgroundColor: BRAND_TOKENS.danger,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            {FILTERS.map((filter) => {
-              const active = filter.id === filterId;
-              const count = counts[filter.id];
-              return (
-                <Pressable
-                  key={filter.id}
-                  onPress={() => setFilterId(filter.id)}
-                  className={`flex-row items-center gap-1.5 rounded-full px-4 ${
-                    active
-                      ? 'bg-brand dark:bg-brand-dark'
-                      : 'bg-default-100'
-                  }`}
-                  style={{ minHeight: 36 }}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                >
-                  <Text
-                    className={`text-sm font-semibold ${
-                      active
-                        ? 'text-white'
-                        : 'text-default-500'
-                    }`}
-                  >
-                    {filter.label}
-                  </Text>
-                  <View
-                    className={`rounded-full px-1.5 ${
-                      active ? 'bg-white/25' : 'bg-default-200'
-                    }`}
-                  >
-                    <Text
-                      className={`text-[10px] font-bold ${
-                        active ? 'text-white' : 'text-default-500'
-                      }`}
-                    >
-                      {count}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {/* 상태별 분기 */}
-          {isLoading ? <LoadingView label="요청 목록을 불러오고 있어요" /> : null}
-          {error ? (
-            <ErrorView
-              title="요청 목록을 불러오지 못했어요"
-              message="네트워크 상태를 확인하고 다시 시도해 주세요."
-              onRetry={() => {
-                void refetch();
+            <Text
+              style={{
+                color: BRAND_TOKENS.onBrand100,
+                fontFamily: FONT_FAMILY,
+                fontSize: 10,
+                fontWeight: '700',
               }}
-            />
-          ) : null}
-          {!isLoading && !error && filteredItems.length === 0 ? (
-            <EmptyView
-              title={
-                filterId === 'all'
-                  ? '확인할 지원 요청이 없어요'
-                  : '해당 분류에 요청이 없어요'
-              }
-              description="새 요청이 들어오면 자동으로 갱신돼요."
-            />
-          ) : null}
-
-          {/* 요청 카드 */}
-          <View className="gap-3">
-            {filteredItems.map(({ item, classification }) => (
-              <Pressable
-                key={item.id}
-                onPress={() => router.push(`/(app)/support/${item.id}`)}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.origin_station_name}에서 ${item.destination_station_name}으로 가는 요청, ${classification.label}`}
-              >
-                <Card
-                  className={`rounded-2xl ${
-                    classification.isActionable
-                      ? 'border-l-4 border-brand dark:border-brand-dark'
-                      : 'border border-default-200'
-                  }`}
-                >
-                  <Card.Body className="gap-3 p-4">
-                    {/* 상단: 상태 + 분류 + 경과시간 */}
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center gap-2">
-                        <StatusChip status={item.status} size="sm" />
-                        <Text className="text-xs text-default-400">
-                          {classification.label}
-                        </Text>
-                      </View>
-                      <Text className="text-xs text-default-400">
-                        {formatElapsed(item.created_at)}
-                      </Text>
-                    </View>
-
-                    {/* 출발 → 도착 */}
-                    <View className="gap-1">
-                      <Text className="text-base font-bold text-foreground">
-                        {item.origin_station_name}{' '}
-                        <Text className="text-default-300">→</Text>{' '}
-                        {item.destination_station_name}
-                      </Text>
-                      <Text className="text-xs text-default-400">
-                        요청자 {item.passenger_name}
-                        {item.assigned_staff_name
-                          ? ` · 담당 ${item.assigned_staff_name}`
-                          : ''}
-                      </Text>
-                    </View>
-
-                    {/* 지원 유형 + 만남 위치 */}
-                    <View className="flex-row flex-wrap items-center gap-2">
-                      {item.support_types.map((type) => (
-                        <View
-                          key={type}
-                          className="flex-row items-center gap-1 rounded-full bg-brand-tint px-2.5 py-1 dark:bg-brand-tint-dark"
-                        >
-                          <Text className="text-sm">
-                            {SUPPORT_TYPE_EMOJI[type] ?? '·'}
-                          </Text>
-                          <Text className="text-xs font-medium text-brand dark:text-brand-dark">
-                            {SUPPORT_TYPE_LABELS[type]}
-                          </Text>
-                        </View>
-                      ))}
-                      <View className="flex-row items-center gap-1 rounded-full bg-default-100 px-2.5 py-1">
-                        <Text className="text-xs text-default-500">
-                          📍 {MEETING_POINT_LABELS[item.meeting_point]}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* 1차 액션 안내 */}
-                    <View className="flex-row items-center justify-between border-t border-default-100 pt-3">
-                      <Text className="text-xs text-default-400">
-                        {classification.description}
-                      </Text>
-                      <View
-                        className={`rounded-full px-3 py-1.5 ${
-                          classification.isActionable
-                            ? 'bg-brand dark:bg-brand-dark'
-                            : 'bg-default-200'
-                        }`}
-                      >
-                        <Text
-                          className={`text-xs font-semibold ${
-                            classification.isActionable
-                              ? 'text-white'
-                              : 'text-default-500'
-                          }`}
-                        >
-                          {primaryActionLabel(item.status, classification)}
-                        </Text>
-                      </View>
-                    </View>
-                  </Card.Body>
-                </Card>
-              </Pressable>
-            ))}
+            >
+              {count}
+            </Text>
           </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function RequestQueueCard({
+  request,
+  onPress,
+}: {
+  request: SupportRequestListItem;
+  onPress: () => void;
+}) {
+  const waitMin = elapsedMinutes(request.created_at);
+  const urgent = waitMin >= 5 && request.status === 'submitted';
+  const originLine = getLineMeta(request.origin_station_name);
+  const destLine = getLineMeta(request.destination_station_name);
+  return (
+    <GyoumCard padding={16} onPress={onPress} style={{ position: 'relative' }}>
+      {urgent ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: -6,
+            right: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
+            backgroundColor: BRAND_TOKENS.danger,
+          }}
+        >
+          <Text
+            style={{
+              color: BRAND_TOKENS.onBrand100,
+              fontFamily: FONT_FAMILY,
+              fontSize: 10,
+              fontWeight: '700',
+              letterSpacing: 0.5,
+            }}
+          >
+            {waitMin}분 대기
+          </Text>
         </View>
-      </ScrollView>
+      ) : null}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 12,
+        }}
+      >
+        <View>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 11,
+              color: BRAND_TOKENS.textMuted,
+              marginBottom: 2,
+            }}
+          >
+            #{request.id.slice(-6).toUpperCase()}
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 16,
+              fontWeight: '700',
+              color: BRAND_TOKENS.text,
+            }}
+          >
+            {request.passenger_name}
+          </Text>
+        </View>
+        <StatusChip status={request.status} size="sm" />
+      </View>
+
+      {/* 경로 */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          backgroundColor: BRAND_TOKENS.surfaceAlt,
+          borderRadius: 10,
+          marginBottom: 12,
+        }}
+      >
+        <LineBadge char={originLine.char} color={originLine.color} size={20} />
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 13,
+            fontWeight: '600',
+            color: BRAND_TOKENS.text,
+            flexShrink: 1,
+          }}
+          numberOfLines={1}
+        >
+          {request.origin_station_name}
+        </Text>
+        <ArrowRightIcon color={BRAND_TOKENS.textMuted} size={14} />
+        <LineBadge char={destLine.char} color={destLine.color} size={20} />
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 13,
+            fontWeight: '600',
+            color: BRAND_TOKENS.text,
+            flexShrink: 1,
+          }}
+          numberOfLines={1}
+        >
+          {request.destination_station_name}
+        </Text>
+      </View>
+
+      {/* 지원 유형 */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+        {request.support_types.map((type) => (
+          <View
+            key={type}
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 6,
+              backgroundColor: BRAND_TOKENS.surfaceAlt,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 11,
+                color: BRAND_TOKENS.textMid,
+                fontWeight: '500',
+              }}
+            >
+              {SUPPORT_TYPE_LABELS[type]}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* 만남 위치 */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <PinIcon color={BRAND_TOKENS.accent} size={14} />
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 13,
+            color: BRAND_TOKENS.textMid,
+          }}
+        >
+          {MEETING_POINT_LABELS[request.meeting_point]}
+        </Text>
+      </View>
+    </GyoumCard>
+  );
+}
+
+function DoneCard({ request }: { request: SupportRequestListItem }) {
+  return (
+    <GyoumCard padding={14}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: BRAND_TOKENS.successBg,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CheckIcon color={BRAND_TOKENS.success} size={18} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 14,
+              fontWeight: '600',
+              color: BRAND_TOKENS.text,
+            }}
+          >
+            {request.passenger_name}
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 12,
+              color: BRAND_TOKENS.textMuted,
+            }}
+            numberOfLines={1}
+          >
+            {request.origin_station_name} → {request.destination_station_name}
+          </Text>
+        </View>
+      </View>
+    </GyoumCard>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <View
+      style={{
+        paddingVertical: 48,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        backgroundColor: BRAND_TOKENS.surface,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: BRAND_TOKENS.border,
+      }}
+    >
+      <Text style={{ fontFamily: FONT_FAMILY, fontSize: 14, color: BRAND_TOKENS.textMuted }}>
+        {text}
+      </Text>
     </View>
   );
 }

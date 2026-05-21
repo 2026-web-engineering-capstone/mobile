@@ -1,470 +1,825 @@
+/**
+ * 교움 디자인 시안의 승객 지원 요청 4단계 플로우.
+ *
+ * 단계: stationPick(출발/도착) → supportTypes(다중 선택) → meeting(만남위치+메모) → review(확인).
+ * 제출 후 라우터로 `/support/status/[requestId]`로 이동.
+ */
+import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Button } from 'heroui-native/button';
-import { Card } from 'heroui-native/card';
-import { Chip } from 'heroui-native/chip';
-import { Separator } from 'heroui-native/separator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  MEETING_POINT_LABELS,
-  SUPPORT_TYPE_LABELS,
-  useRequestDraftStore,
-} from '@/features/support-request/store/use-request-draft-store';
-import type {
-  MeetingPoint,
-  SupportType,
-} from '@/features/support-request/store/use-request-draft-store';
+  BottomBar,
+  CheckIcon,
+  Divider,
+  GyoumAppBar,
+  GyoumCTA,
+  GyoumCard,
+  GyoumSearchInput,
+  LineBadge,
+  PageTitle,
+  PinIcon,
+  Screen,
+  SectionLabel,
+  StationChipDS,
+  ToggleChip,
+  SUPPORT_TYPE_ICONS,
+} from '@/components/ui';
+import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getLineMeta } from '@/lib/design-tokens';
 import {
   useCreateSupportRequest,
   useStations,
 } from '@/features/support-request/hooks/use-support-requests';
-import { useAuth } from '@/providers/auth-provider';
+import {
+  MEETING_POINT_LABELS,
+  MEETING_POINT_ORDER,
+  SUPPORT_TYPE_DESCRIPTIONS,
+  SUPPORT_TYPE_LABELS,
+  SUPPORT_TYPE_ORDER,
+  useRequestDraftStore,
+  type MeetingPoint,
+} from '@/features/support-request/store/use-request-draft-store';
+import { ApiError } from '@/lib/api/client';
+import type { Station } from '@/lib/api/types';
 
-function getErrorMessage() {
-  return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
-}
-
-function selectOriginStation(
-  stationId: string,
-  destinationStationId: string,
-  setOriginStationId: (value: string) => void,
-  setDestinationStationId: (value: string) => void,
-) {
-  setOriginStationId(stationId);
-  if (destinationStationId === stationId) {
-    setDestinationStationId('');
-  }
-}
-
-function selectDestinationStation(
-  stationId: string,
-  originStationId: string,
-  setOriginStationId: (value: string) => void,
-  setDestinationStationId: (value: string) => void,
-) {
-  setDestinationStationId(stationId);
-  if (originStationId === stationId) {
-    setOriginStationId('');
-  }
-}
+type Step = 'stationPick' | 'supportTypes' | 'meeting' | 'review';
 
 export function RequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { role } = useAuth();
-  const {
-    data: stations = [],
-    error: stationsError,
-    isLoading: isStationsLoading,
-  } = useStations();
-  const createRequestMutation = useCreateSupportRequest();
-  const {
-    destinationStationId,
-    meetingPoint,
-    notes,
-    originStationId,
-    supportTypes,
-    setDestinationStationId,
-    setMeetingPoint,
-    setNotes,
-    setOriginStationId,
-    toggleSupportType,
-    reset,
-  } = useRequestDraftStore();
+  const draft = useRequestDraftStore();
+  const createMutation = useCreateSupportRequest();
+  const [step, setStep] = useState<Step>('stationPick');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const hasStations = stations.length > 0;
-  const isCreatingRequest = createRequestMutation.isPending;
-  const canSelectStations = !isStationsLoading && !stationsError && hasStations;
-  const selectedOriginStation = stations.find((station) => station.id === originStationId);
-  const selectedDestinationStation = stations.find(
-    (station) => station.id === destinationStationId,
-  );
-  const originStation = selectedOriginStation?.name ?? '출발역 선택';
-  const destinationStation = selectedDestinationStation?.name ?? '도착역 선택';
-  const hasSameStationSelection = Boolean(
-    originStationId &&
-      destinationStationId &&
-      originStationId === destinationStationId,
-  );
-  const hasValidStationSelection = Boolean(
-    selectedOriginStation && selectedDestinationStation && !hasSameStationSelection,
-  );
-  const routeValidationMessage = (() => {
-    if (!canSelectStations) {
-      return null;
-    }
-
-    if (!originStationId && !destinationStationId) {
-      return '출발역과 도착역을 모두 선택해주세요.';
-    }
-
-    if (!originStationId) {
-      return '출발역을 선택해주세요.';
-    }
-
-    if (!destinationStationId) {
-      return '도착역을 선택해주세요.';
-    }
-
-    if (hasSameStationSelection) {
-      return '출발역과 도착역은 서로 달라야 합니다.';
-    }
-
-    if (!hasValidStationSelection) {
-      return '선택한 역 정보를 다시 확인해주세요.';
-    }
-
-    return null;
-  })();
-  const supportTypeValidationMessage =
-    supportTypes.length === 0 ? '지원 유형을 하나 이상 선택해주세요.' : null;
-  const supportTypeSummary =
-    supportTypes.length > 0
-      ? supportTypes.map((type) => SUPPORT_TYPE_LABELS[type]).join(', ')
-      : '지원 유형 미선택';
-  const isSubmitDisabled =
-    !canSelectStations ||
-    !hasValidStationSelection ||
-    supportTypes.length === 0 ||
-    isCreatingRequest;
-
-  if (role !== 'passenger') {
-    return <Redirect href="/(app)/(tabs)" />;
-  }
-
-  const handleSubmit = () => {
-    if (!canSelectStations || !hasValidStationSelection || supportTypes.length === 0) {
+  const handleBackOrPrevStep = () => {
+    if (step === 'stationPick') {
+      router.back();
       return;
     }
+    if (step === 'supportTypes') setStep('stationPick');
+    else if (step === 'meeting') setStep('supportTypes');
+    else if (step === 'review') setStep('meeting');
+  };
 
-    if (originStationId === destinationStationId) {
+  const onSubmit = async () => {
+    if (!draft.originStationId || !draft.destinationStationId) return;
+    if (draft.originStationId === draft.destinationStationId) {
+      setErrorMessage('출발 역과 도착 역이 같을 수 없습니다.');
       return;
     }
-
-    createRequestMutation.mutate(
-      {
-        origin_station_id: originStationId,
-        destination_station_id: destinationStationId,
-        meeting_point: meetingPoint,
-        notes: notes.trim(),
-        support_types: supportTypes,
-      },
-      {
-        onSuccess: (created) => {
-          reset();
-          router.replace(`/(app)/support/status/${created.id}`);
-        },
-      },
-    );
+    if (draft.supportTypes.length === 0) {
+      setErrorMessage('지원 유형을 1개 이상 선택해주세요.');
+      return;
+    }
+    setErrorMessage(null);
+    try {
+      const created = await createMutation.mutateAsync({
+        origin_station_id: draft.originStationId,
+        destination_station_id: draft.destinationStationId,
+        meeting_point: draft.meetingPoint,
+        notes: draft.notes,
+        support_types: draft.supportTypes,
+      });
+      draft.reset();
+      router.replace(`/(app)/support/status/${created.id}`);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setErrorMessage(error.message || '요청 제출 중 문제가 발생했습니다.');
+      } else {
+        setErrorMessage('요청 제출 중 문제가 발생했습니다.');
+      }
+    }
   };
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="auto" />
+    <Screen background="bg" padded={false} edges={[]}>
+      <StatusBar style="dark" />
+      <GyoumAppBar
+        title={
+          step === 'stationPick'
+            ? '역 선택'
+            : step === 'supportTypes'
+              ? '지원 유형'
+              : step === 'meeting'
+                ? '만남 위치'
+                : '요청 확인'
+        }
+        topInset={insets.top}
+        onBack={handleBackOrPrevStep}
+      />
+      {step === 'stationPick' ? (
+        <StationPickStep
+          insets={insets}
+          onNext={() => setStep('supportTypes')}
+        />
+      ) : step === 'supportTypes' ? (
+        <SupportTypesStep insets={insets} onNext={() => setStep('meeting')} />
+      ) : step === 'meeting' ? (
+        <MeetingStep insets={insets} onNext={() => setStep('review')} />
+      ) : (
+        <ReviewStep
+          insets={insets}
+          isSubmitting={createMutation.isPending}
+          errorMessage={errorMessage}
+          onSubmit={onSubmit}
+          onEdit={(target) => {
+            if (target === 'station') setStep('stationPick');
+            else if (target === 'support') setStep('supportTypes');
+            else setStep('meeting');
+          }}
+        />
+      )}
+    </Screen>
+  );
+}
+
+// ─── Step 1: 출발/도착 역 선택 ──────────────────────────
+function StationPickStep({
+  insets,
+  onNext,
+}: {
+  insets: ReturnType<typeof useSafeAreaInsets>;
+  onNext: () => void;
+}) {
+  const {
+    originStationId,
+    destinationStationId,
+    setOriginStationId,
+    setDestinationStationId,
+  } = useRequestDraftStore();
+  const [focus, setFocus] = useState<'depart' | 'arrive'>(
+    originStationId ? 'arrive' : 'depart',
+  );
+  const [query, setQuery] = useState('');
+  const stationsQuery = useStations(query.trim() || undefined);
+  const stations = stationsQuery.data ?? [];
+
+  const depart = stations.find((s) => s.id === originStationId);
+  const arrive = stations.find((s) => s.id === destinationStationId);
+
+  const setStation = (station: Station) => {
+    if (focus === 'depart') {
+      setOriginStationId(station.id);
+      setFocus('arrive');
+    } else {
+      setDestinationStationId(station.id);
+    }
+    setQuery('');
+  };
+
+  const swap = () => {
+    setOriginStationId(destinationStationId);
+    setDestinationStationId(originStationId);
+  };
+
+  const canNext =
+    !!originStationId &&
+    !!destinationStationId &&
+    originStationId !== destinationStationId;
+
+  return (
+    <>
       <ScrollView
-        className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 100,
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 140,
         }}
+        keyboardShouldPersistTaps="handled"
       >
-        <View className="gap-6 px-5">
-          <View className="gap-1">
-            <Text className="text-2xl font-bold tracking-tight text-foreground">
-              지원 요청
+        <PageTitle sub="출발할 역과 도착할 역을 선택해주세요.">
+          어디로 이동하시나요?
+        </PageTitle>
+
+        <View style={{ position: 'relative', marginBottom: 20 }}>
+          <SlotRow
+            label="출발"
+            station={depart}
+            focused={focus === 'depart'}
+            onPress={() => setFocus('depart')}
+            placeholder="출발 역 선택"
+          />
+          <View style={{ height: 8 }} />
+          <SlotRow
+            label="도착"
+            station={arrive}
+            focused={focus === 'arrive'}
+            onPress={() => setFocus('arrive')}
+            placeholder="도착 역 선택"
+          />
+          <Pressable
+            onPress={swap}
+            accessibilityRole="button"
+            accessibilityLabel="출발 도착 바꾸기"
+            style={{
+              position: 'absolute',
+              right: 14,
+              top: '50%',
+              marginTop: -16,
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: BRAND_TOKENS.surface,
+              borderWidth: 1.5,
+              borderColor: BRAND_TOKENS.border,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: BRAND_TOKENS.textMid, fontSize: 16, fontWeight: '600' }}>
+              ⇅
             </Text>
-            <Text className="text-sm text-default-400">
-              출발역과 도착역을 선택하고 필요한 지원을 알려주세요
+          </Pressable>
+        </View>
+
+        <GyoumSearchInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="역 이름 검색"
+          onClear={() => setQuery('')}
+        />
+
+        <View style={{ height: 16 }} />
+        <SectionLabel>
+          {query ? `검색 결과 (${stations.length})` : '전체 역'}
+        </SectionLabel>
+        <View style={{ gap: 8 }}>
+          {stationsQuery.isLoading ? (
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                color: BRAND_TOKENS.textMuted,
+                textAlign: 'center',
+                paddingVertical: 24,
+              }}
+            >
+              불러오는 중...
             </Text>
-          </View>
-
-          {isStationsLoading ? (
-            <Card className="rounded-2xl border border-default-200">
-              <Card.Body className="p-4">
-                <Text className="text-sm text-default-500">
-                  역 목록을 불러오는 중입니다.
-                </Text>
-              </Card.Body>
-            </Card>
           ) : null}
-
-          {stationsError ? (
-            <Card className="rounded-2xl border border-warning/30">
-              <Card.Body className="p-4">
-                <Text className="text-sm text-warning">
-                  역 목록을 불러오지 못해 요청 제출이 잠시 비활성화되었습니다.
-                </Text>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {!isStationsLoading && !stationsError && !hasStations ? (
-            <Card className="rounded-2xl border border-warning/30">
-              <Card.Body className="p-4">
-                <Text className="text-sm text-warning">
-                  현재 선택 가능한 역 정보가 없어 요청을 진행할 수 없습니다.
-                </Text>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {createRequestMutation.error ? (
-            <Card className="rounded-2xl border border-danger/30">
-              <Card.Body className="p-4">
-                <Text className="text-sm text-danger">
-                  {getErrorMessage()}
-                </Text>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          {isCreatingRequest ? (
-            <Card className="rounded-2xl border border-brand/20 dark:border-brand-dark/20">
-              <Card.Body className="p-4">
-                <Text className="text-sm text-brand dark:text-brand-dark">
-                  요청을 제출하는 중입니다. 잠시만 기다려주세요.
-                </Text>
-              </Card.Body>
-            </Card>
-          ) : null}
-
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-4 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-default-400">
-                경로
-              </Text>
-              <View className="gap-3">
-                <View className="gap-1.5">
-                  <Text className="text-xs font-medium text-default-500">
-                    출발역
-                  </Text>
-                  <Pressable
-                    className={`rounded-xl border border-default-200 bg-background px-4 py-3 ${
-                      canSelectStations && !isCreatingRequest ? '' : 'opacity-50'
-                    }`}
-                    disabled={!canSelectStations || isCreatingRequest}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(app)/stations/search',
-                        params: { context: 'origin' },
-                      })
-                    }
-                  >
-                    <Text
-                      className={`text-sm ${selectedOriginStation ? 'font-medium text-foreground' : 'text-default-400'}`}
-                    >
-                      {originStation}
-                    </Text>
-                  </Pressable>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    className="-mx-1"
-                    contentContainerClassName="gap-2 px-1"
-                  >
-                    {stations.map((station) => (
-                      <Chip
-                        key={`origin-${station.id}`}
-                        variant={originStationId === station.id ? 'primary' : 'soft'}
-                        disabled={!canSelectStations || isCreatingRequest}
-                        className={
-                          originStationId === station.id
-                            ? 'bg-brand dark:bg-brand-dark'
-                            : ''
-                        }
-                        onPress={() =>
-                          selectOriginStation(
-                            station.id,
-                            destinationStationId,
-                            setOriginStationId,
-                            setDestinationStationId,
-                          )
-                        }
-                      >
-                        {station.name.replace('역', '')}
-                      </Chip>
-                    ))}
-                  </ScrollView>
-                </View>
-                <Separator />
-                <View className="gap-1.5">
-                  <Text className="text-xs font-medium text-default-500">
-                    도착역
-                  </Text>
-                  <Pressable
-                    className={`rounded-xl border border-default-200 bg-background px-4 py-3 ${
-                      canSelectStations && !isCreatingRequest ? '' : 'opacity-50'
-                    }`}
-                    disabled={!canSelectStations || isCreatingRequest}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(app)/stations/search',
-                        params: { context: 'destination' },
-                      })
-                    }
-                  >
-                    <Text
-                      className={`text-sm ${selectedDestinationStation ? 'font-medium text-foreground' : 'text-default-400'}`}
-                    >
-                      {destinationStation}
-                    </Text>
-                  </Pressable>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    className="-mx-1"
-                    contentContainerClassName="gap-2 px-1"
-                  >
-                    {stations.map((station) => (
-                      <Chip
-                        key={`destination-${station.id}`}
-                        variant={destinationStationId === station.id ? 'primary' : 'soft'}
-                        disabled={!canSelectStations || isCreatingRequest}
-                        className={
-                          destinationStationId === station.id
-                            ? 'bg-brand dark:bg-brand-dark'
-                            : ''
-                        }
-                        onPress={() =>
-                          selectDestinationStation(
-                            station.id,
-                            originStationId,
-                            setOriginStationId,
-                            setDestinationStationId,
-                          )
-                        }
-                      >
-                        {station.name.replace('역', '')}
-                      </Chip>
-                    ))}
-                  </ScrollView>
-                </View>
-              </View>
-              {routeValidationMessage ? (
-                <Text className="text-xs text-warning">{routeValidationMessage}</Text>
-              ) : null}
-            </Card.Body>
-          </Card>
-
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-4 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-default-400">
-                지원 유형
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {(
-                  Object.entries(SUPPORT_TYPE_LABELS) as [SupportType, string][]
-                ).map(([key, label]) => {
-                  const selected = supportTypes.includes(key);
-                  return (
-                    <Chip
-                      key={key}
-                      variant={selected ? 'primary' : 'soft'}
-                      disabled={isCreatingRequest}
-                      className={selected ? 'bg-brand dark:bg-brand-dark' : ''}
-                      onPress={() => toggleSupportType(key)}
-                    >
-                      {label}
-                    </Chip>
-                  );
-                })}
-              </View>
-              {supportTypeValidationMessage ? (
-                <Text className="text-xs text-warning">
-                  {supportTypeValidationMessage}
-                </Text>
-              ) : null}
-            </Card.Body>
-          </Card>
-
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-4 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-default-400">
-                만남 위치
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {(
-                  Object.entries(MEETING_POINT_LABELS) as [MeetingPoint, string][]
-                ).map(([key, label]) => {
-                  const selected = meetingPoint === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      disabled={isCreatingRequest}
-                      onPress={() => setMeetingPoint(key)}
-                      className={`rounded-full border px-4 py-2 ${
-                        selected
-                          ? 'border-brand bg-brand-tint dark:border-brand-dark dark:bg-brand-tint-dark'
-                          : 'border-default-200 bg-background'
-                      } ${isCreatingRequest ? 'opacity-50' : ''}`}
-                    >
-                      <Text
-                        className={`text-sm ${selected ? 'font-semibold text-brand dark:text-brand-dark' : 'text-default-600'}`}
-                      >
-                        {label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </Card.Body>
-          </Card>
-
-          <Card className="rounded-2xl">
-            <Card.Body className="gap-3 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-default-400">
-                추가 메모 (선택)
-              </Text>
-              <TextInput
-                className="min-h-[80px] rounded-xl bg-default-100 px-4 py-3 text-sm text-foreground"
-                multiline
-                maxLength={200}
-                placeholder="예: 전동휠체어 사용, 동행자 1명 있음"
-                placeholderTextColor={undefined}
-                textAlignVertical="top"
-                editable={!isCreatingRequest}
-                value={notes}
-                onChangeText={setNotes}
-              />
-              <Text className="text-right text-xs text-default-300">
-                {notes.length}/200
-              </Text>
-            </Card.Body>
-          </Card>
-
-          <Card className="rounded-2xl border-brand bg-brand-surface dark:border-brand-dark dark:bg-brand-surface-dark">
-            <Card.Body className="gap-2 p-4">
-              <Text className="text-xs font-semibold tracking-wider text-brand dark:text-brand-dark">
-                요청 요약
-              </Text>
-              <Text className="text-base font-semibold text-foreground">
-                {originStation} → {destinationStation}
-              </Text>
-              <Text className="text-sm text-default-600">
-                {supportTypeSummary} · {MEETING_POINT_LABELS[meetingPoint]}
-              </Text>
-              {notes ? (
-                <Text className="text-xs text-default-400">메모: {notes}</Text>
-              ) : null}
-            </Card.Body>
-          </Card>
+          {stations.map((s) => (
+            <StationChipDS
+              key={s.id}
+              station={s}
+              size="sm"
+              selected={(focus === 'depart' ? depart : arrive)?.id === s.id}
+              onPress={() => setStation(s)}
+            />
+          ))}
         </View>
       </ScrollView>
 
+      <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <GyoumCTA variant="primary" disabled={!canNext} onPress={onNext}>
+          다음
+        </GyoumCTA>
+      </BottomBar>
+    </>
+  );
+}
+
+function SlotRow({
+  label,
+  station,
+  focused,
+  onPress,
+  placeholder,
+}: {
+  label: string;
+  station?: Station;
+  focused: boolean;
+  onPress: () => void;
+  placeholder: string;
+}) {
+  const lineMeta = station ? getLineMeta(station.line) : null;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} 역 선택`}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: RADIUS.chip,
+        backgroundColor: focused ? BRAND_TOKENS.brandLight : BRAND_TOKENS.surface,
+        borderWidth: 2,
+        borderColor: focused ? BRAND_TOKENS.brand : BRAND_TOKENS.border,
+      }}
+    >
       <View
-        className="border-t border-default-100 bg-background px-5 pt-3"
-        style={{ paddingBottom: insets.bottom + 12 }}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: label === '출발' ? BRAND_TOKENS.brand : BRAND_TOKENS.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
-        <Button
-          size="lg"
-          className="rounded-xl bg-brand dark:bg-brand-dark"
-          isDisabled={isSubmitDisabled}
-          onPress={handleSubmit}
+        <Text
+          style={{
+            color: BRAND_TOKENS.textOnDark,
+            fontFamily: FONT_FAMILY,
+            fontSize: 13,
+            fontWeight: '700',
+          }}
         >
-          {isCreatingRequest ? '요청 제출 중...' : '지원 요청하기'}
-        </Button>
+          {label}
+        </Text>
       </View>
+      <View style={{ flex: 1 }}>
+        {station && lineMeta ? (
+          <>
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 16,
+                fontWeight: '600',
+                color: BRAND_TOKENS.text,
+              }}
+            >
+              {station.name}
+            </Text>
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 12,
+                color: BRAND_TOKENS.textMuted,
+              }}
+            >
+              {station.line}
+            </Text>
+          </>
+        ) : (
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 15,
+              color: BRAND_TOKENS.textMuted,
+            }}
+          >
+            {placeholder}
+          </Text>
+        )}
+      </View>
+      {station && lineMeta ? (
+        <LineBadge char={lineMeta.char} color={lineMeta.color} size={24} />
+      ) : null}
+    </Pressable>
+  );
+}
+
+// ─── Step 2: 지원 유형 ──────────────────────────────────
+function SupportTypesStep({
+  insets,
+  onNext,
+}: {
+  insets: ReturnType<typeof useSafeAreaInsets>;
+  onNext: () => void;
+}) {
+  const { supportTypes, toggleSupportType } = useRequestDraftStore();
+  return (
+    <>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 140,
+        }}
+      >
+        <PageTitle sub="필요한 지원을 모두 선택해주세요. (다중 선택 가능)">
+          어떤 지원이 필요하신가요?
+        </PageTitle>
+        <View style={{ gap: 10 }}>
+          {SUPPORT_TYPE_ORDER.map((type) => {
+            const Icon = SUPPORT_TYPE_ICONS[type];
+            const selected = supportTypes.includes(type);
+            return (
+              <ToggleChip
+                key={type}
+                icon={<Icon color={selected ? BRAND_TOKENS.textOnDark : BRAND_TOKENS.text} size={22} />}
+                label={SUPPORT_TYPE_LABELS[type]}
+                sub={SUPPORT_TYPE_DESCRIPTIONS[type]}
+                selected={selected}
+                onPress={() => toggleSupportType(type)}
+              />
+            );
+          })}
+        </View>
+      </ScrollView>
+      <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <GyoumCTA
+          variant="primary"
+          disabled={supportTypes.length === 0}
+          onPress={onNext}
+        >
+          {supportTypes.length > 0 ? `${supportTypes.length}개 선택 · 다음` : '다음'}
+        </GyoumCTA>
+      </BottomBar>
+    </>
+  );
+}
+
+// ─── Step 3: 만남 위치 + 메모 ──────────────────────────
+function MeetingStep({
+  insets,
+  onNext,
+}: {
+  insets: ReturnType<typeof useSafeAreaInsets>;
+  onNext: () => void;
+}) {
+  const { meetingPoint, notes, setMeetingPoint, setNotes } = useRequestDraftStore();
+  return (
+    <>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 140,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <PageTitle sub="역무원이 찾기 쉬운 위치를 선택해주세요.">
+          어디서 만날까요?
+        </PageTitle>
+        <SectionLabel>역 내 위치</SectionLabel>
+        <View style={{ gap: 8 }}>
+          {MEETING_POINT_ORDER.map((point) => (
+            <MeetingRow
+              key={point}
+              point={point}
+              selected={meetingPoint === point}
+              onPress={() => setMeetingPoint(point)}
+            />
+          ))}
+        </View>
+        <View style={{ marginTop: 24 }}>
+          <SectionLabel>추가 메모 (선택)</SectionLabel>
+          <TextInput
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="예: 빨간 패딩에 휠체어를 이용하고 있어요"
+            placeholderTextColor={BRAND_TOKENS.textMuted}
+            multiline
+            style={{
+              minHeight: 100,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              borderRadius: RADIUS.chip,
+              backgroundColor: BRAND_TOKENS.surface,
+              borderWidth: 1.5,
+              borderColor: BRAND_TOKENS.border,
+              fontFamily: FONT_FAMILY,
+              fontSize: 15,
+              color: BRAND_TOKENS.text,
+              textAlignVertical: 'top',
+              lineHeight: 22,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 12,
+              color: BRAND_TOKENS.textMuted,
+              marginTop: 8,
+            }}
+          >
+            인상착의나 동행자 정보가 있으면 역무원이 더 빨리 찾을 수 있어요.
+          </Text>
+        </View>
+      </ScrollView>
+      <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <GyoumCTA variant="primary" disabled={!meetingPoint} onPress={onNext}>
+          다음
+        </GyoumCTA>
+      </BottomBar>
+    </>
+  );
+}
+
+function MeetingRow({
+  point,
+  selected,
+  onPress,
+}: {
+  point: MeetingPoint;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={MEETING_POINT_LABELS[point]}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: RADIUS.chip,
+        backgroundColor: selected ? BRAND_TOKENS.brandLight : BRAND_TOKENS.surface,
+        borderWidth: 1.5,
+        borderColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.border,
+      }}
+    >
+      <PinIcon color={selected ? BRAND_TOKENS.brand : BRAND_TOKENS.textMuted} size={20} />
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 15,
+          fontWeight: selected ? '600' : '500',
+          color: BRAND_TOKENS.text,
+          flex: 1,
+        }}
+      >
+        {MEETING_POINT_LABELS[point]}
+      </Text>
+      {selected ? <CheckIcon color={BRAND_TOKENS.brand} size={20} /> : null}
+    </Pressable>
+  );
+}
+
+// ─── Step 4: 확인 ──────────────────────────────────────
+function ReviewStep({
+  insets,
+  isSubmitting,
+  errorMessage,
+  onSubmit,
+  onEdit,
+}: {
+  insets: ReturnType<typeof useSafeAreaInsets>;
+  isSubmitting: boolean;
+  errorMessage: string | null;
+  onSubmit: () => void;
+  onEdit: (target: 'station' | 'support' | 'meeting') => void;
+}) {
+  const draft = useRequestDraftStore();
+  const stationsQuery = useStations();
+  const stations = stationsQuery.data ?? [];
+  const depart = stations.find((s) => s.id === draft.originStationId);
+  const arrive = stations.find((s) => s.id === draft.destinationStationId);
+
+  if (!depart || !arrive) {
+    return (
+      <View style={{ padding: 24 }}>
+        <Text style={{ fontFamily: FONT_FAMILY, color: BRAND_TOKENS.textMuted }}>
+          역 정보를 불러오는 중...
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 140,
+        }}
+      >
+        <PageTitle sub="아래 내용으로 출발 역 역무원에게 전달됩니다.">
+          요청 내용을 확인해주세요
+        </PageTitle>
+
+        <GyoumCard padding={0} style={{ marginBottom: 12, overflow: 'hidden' }}>
+          <ReviewRow label="경로" onEdit={() => onEdit('station')}>
+            <View style={{ gap: 10 }}>
+              <RouteEnd type="출발" station={depart} />
+              <View
+                style={{
+                  height: 18,
+                  width: 2,
+                  marginLeft: 13,
+                  backgroundColor: BRAND_TOKENS.borderStrong,
+                }}
+              />
+              <RouteEnd type="도착" station={arrive} />
+            </View>
+          </ReviewRow>
+        </GyoumCard>
+
+        <GyoumCard padding={0}>
+          <ReviewRow label="지원 유형" onEdit={() => onEdit('support')}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {draft.supportTypes.map((type) => (
+                <View
+                  key={type}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: RADIUS.pill,
+                    backgroundColor: BRAND_TOKENS.brandLight,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: FONT_FAMILY,
+                      fontSize: 13,
+                      color: BRAND_TOKENS.brand,
+                      fontWeight: '500',
+                    }}
+                  >
+                    {SUPPORT_TYPE_LABELS[type]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </ReviewRow>
+          <Divider />
+          <ReviewRow label="만남 위치" onEdit={() => onEdit('meeting')}>
+            <View>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 15,
+                  color: BRAND_TOKENS.text,
+                  fontWeight: '500',
+                }}
+              >
+                {MEETING_POINT_LABELS[draft.meetingPoint]}
+              </Text>
+              {draft.notes ? (
+                <View
+                  style={{
+                    marginTop: 6,
+                    padding: 10,
+                    backgroundColor: BRAND_TOKENS.surfaceAlt,
+                    borderRadius: RADIUS.xs,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: FONT_FAMILY,
+                      fontSize: 13,
+                      color: BRAND_TOKENS.textMid,
+                    }}
+                  >
+                    “{draft.notes}”
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </ReviewRow>
+        </GyoumCard>
+
+        <View
+          style={{
+            marginTop: 16,
+            padding: 16,
+            borderRadius: RADIUS.chip,
+            backgroundColor: BRAND_TOKENS.warningBg,
+            borderWidth: 1,
+            borderColor: BRAND_TOKENS.warning + '40',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 13,
+              fontWeight: '600',
+              color: BRAND_TOKENS.warning,
+              marginBottom: 4,
+            }}
+          >
+            요청 전 안내
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 13,
+              color: BRAND_TOKENS.textMid,
+              lineHeight: 19,
+            }}
+          >
+            요청을 제출하면 출발 역 역무원이 즉시 알림을 받습니다. 만남 위치에서 5분 이내에 만나뵐 수 있어요.
+          </Text>
+        </View>
+
+        {errorMessage ? (
+          <View
+            style={{
+              marginTop: 16,
+              padding: 14,
+              borderRadius: RADIUS.chip,
+              backgroundColor: BRAND_TOKENS.dangerBg,
+              borderWidth: 1,
+              borderColor: BRAND_TOKENS.danger + '40',
+            }}
+          >
+            <Text style={{ fontFamily: FONT_FAMILY, color: BRAND_TOKENS.danger, fontSize: 13 }}>
+              {errorMessage}
+            </Text>
+          </View>
+        ) : null}
+      </ScrollView>
+      <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <GyoumCTA variant="accent" disabled={isSubmitting} onPress={onSubmit}>
+          {isSubmitting ? '요청 보내는 중...' : '교통지원 요청하기'}
+        </GyoumCTA>
+      </BottomBar>
+    </>
+  );
+}
+
+function ReviewRow({
+  label,
+  onEdit,
+  children,
+}: {
+  label: string;
+  onEdit?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{ padding: 20 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 12,
+            color: BRAND_TOKENS.textMuted,
+            fontWeight: '600',
+            letterSpacing: 0.4,
+          }}
+        >
+          {label.toUpperCase()}
+        </Text>
+        {onEdit ? (
+          <Pressable onPress={onEdit} hitSlop={8} accessibilityRole="button">
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 13,
+                color: BRAND_TOKENS.brand,
+                fontWeight: '600',
+              }}
+            >
+              수정
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function RouteEnd({ type, station }: { type: '출발' | '도착'; station: Station }) {
+  const lineMeta = getLineMeta(station.line);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 14,
+          backgroundColor: type === '출발' ? BRAND_TOKENS.brand : BRAND_TOKENS.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text
+          style={{ color: BRAND_TOKENS.textOnDark, fontSize: 11, fontWeight: '700', fontFamily: FONT_FAMILY }}
+        >
+          {type}
+        </Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 15,
+            fontWeight: '600',
+            color: BRAND_TOKENS.text,
+          }}
+        >
+          {station.name}
+        </Text>
+        <Text
+          style={{ fontFamily: FONT_FAMILY, fontSize: 12, color: BRAND_TOKENS.textMuted }}
+        >
+          {station.line}
+        </Text>
+      </View>
+      <LineBadge char={lineMeta.char} color={lineMeta.color} size={22} />
     </View>
   );
 }
