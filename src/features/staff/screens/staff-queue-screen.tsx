@@ -45,18 +45,18 @@ import { useAuth } from '@/providers/auth-provider';
 type Tab = 'incoming' | 'done';
 const STAFF_QUEUE_SEEN_STORAGE_KEY = 'gyoum.staffQueue.seenRequestKeys.v1';
 
-function elapsedMinutes(createdAt: string): number {
+function elapsedMinutes(createdAt: string, nowMs = Date.now()): number {
   const created = parseApiDate(createdAt).getTime();
   if (Number.isNaN(created)) return 0;
-  return Math.max(0, Math.floor((Date.now() - created) / 60000));
+  return Math.max(0, Math.floor((nowMs - created) / 60000));
 }
 
 function parseApiDate(iso: string) {
   return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
 }
 
-function formatRelativeCreatedAt(createdAt: string): string {
-  const minutes = elapsedMinutes(createdAt);
+function formatRelativeCreatedAt(createdAt: string, nowMs = Date.now()): string {
+  const minutes = elapsedMinutes(createdAt, nowMs);
   if (minutes <= 0) return '방금전';
   if (minutes < 60) return `${minutes}분전`;
 
@@ -69,7 +69,7 @@ function formatRelativeCreatedAt(createdAt: string): string {
     month: '2-digit',
     day: '2-digit',
   });
-  const sameDay = dateParts.format(created) === dateParts.format(new Date());
+  const sameDay = dateParts.format(created) === dateParts.format(new Date(nowMs));
   const time = created.toLocaleTimeString('ko-KR', {
     timeZone: 'Asia/Seoul',
     hour: '2-digit',
@@ -155,6 +155,7 @@ export function StaffQueueScreen() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('incoming');
   const [seenRequestKeys, setSeenRequestKeys] = useState<Set<string>>(new Set());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const requestsQuery = useSupportRequests(user?.role === 'staff');
   const { refetch } = requestsQuery;
 
@@ -180,10 +181,16 @@ export function StaffQueueScreen() {
   useFocusEffect(
     useCallback(() => {
       if (user?.role === 'staff') {
+        setNowMs(Date.now());
         void refetch();
       }
     }, [refetch, user?.role]),
   );
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   const requests = requestsQuery.data ?? [];
   const incoming = useMemo(
@@ -435,6 +442,8 @@ export function StaffQueueScreen() {
                     key={req.id}
                     request={req}
                     user={user}
+                    isUnread={!seenRequestKeys.has(getQueueNoticeKey(req, user))}
+                    nowMs={nowMs}
                     onPress={() => handleIncomingPress(req)}
                   />
                 ))
@@ -450,6 +459,7 @@ export function StaffQueueScreen() {
                     key={req.id}
                     request={req}
                     user={user}
+                    nowMs={nowMs}
                     onPress={() => router.push(`/(app)/support/${req.id}`)}
                   />
                 ))
@@ -575,10 +585,14 @@ function TabButton({
 function RequestQueueCard({
   request,
   user,
+  isUnread,
+  nowMs,
   onPress,
 }: {
   request: SupportRequestListItem;
   user: SessionUser | null;
+  isUnread: boolean;
+  nowMs: number;
   onPress: () => void;
 }) {
   const originLines = getStationLineMetas(
@@ -622,27 +636,21 @@ function RequestQueueCard({
           paddingHorizontal: 10,
           paddingVertical: 4,
           borderRadius: 999,
-          backgroundColor:
-            request.status === 'submitted'
-              ? BRAND_TOKENS.danger
-              : BRAND_TOKENS.surfaceAlt,
-          borderWidth: request.status === 'submitted' ? 0 : 1,
+          backgroundColor: isUnread ? BRAND_TOKENS.danger : BRAND_TOKENS.surfaceAlt,
+          borderWidth: isUnread ? 0 : 1,
           borderColor: BRAND_TOKENS.border,
         }}
       >
         <Text
           style={{
-            color:
-              request.status === 'submitted'
-                ? BRAND_TOKENS.onBrand100
-                : BRAND_TOKENS.textMid,
+            color: isUnread ? BRAND_TOKENS.onBrand100 : BRAND_TOKENS.textMid,
             fontFamily: FONT_FAMILY,
             fontSize: 10,
             fontWeight: '700',
             letterSpacing: 0.2,
           }}
         >
-          {formatRelativeCreatedAt(request.created_at)}
+          {formatRelativeCreatedAt(request.created_at, nowMs)}
         </Text>
       </View>
       <View
@@ -843,10 +851,12 @@ function StationLineBadges({
 function DoneCard({
   request,
   user,
+  nowMs,
   onPress,
 }: {
   request: SupportRequestListItem;
   user: SessionUser | null;
+  nowMs: number;
   onPress: () => void;
 }) {
   const doneKind = getDoneKind(request, user);
@@ -920,7 +930,7 @@ function DoneCard({
             }}
             numberOfLines={1}
           >
-            {formatRelativeCreatedAt(request.created_at)}
+            {formatRelativeCreatedAt(request.created_at, nowMs)}
             {request.train_number ? ` · ${request.train_number}` : ''}
             {request.train_car_number ? ` · ${request.train_car_number}칸` : ''}
           </Text>

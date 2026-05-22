@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
 import {
-  NaverMapMarkerOverlay,
   NaverMapPolylineOverlay,
   NaverMapView,
   type NaverMapViewRef,
@@ -59,7 +58,8 @@ export function NativeNaverMap({
         mapRef.current?.setLocationTrackingMode('NoFollow');
       }}
       locationOverlay={{
-        isVisible: false,
+        isVisible: Boolean(currentLocation),
+        position: currentLocation ?? undefined,
       }}
       layerGroups={{
         BUILDING: true,
@@ -78,17 +78,6 @@ export function NativeNaverMap({
           color={station.line.colors.primary}
           coords={routePath}
           width={5}
-        />
-      ) : null}
-      {currentLocation ? (
-        <NaverMapMarkerOverlay
-          latitude={currentLocation.latitude}
-          longitude={currentLocation.longitude}
-          width={24}
-          height={24}
-          tintColor="#1d7afc"
-          isForceShowIcon
-          caption={{ text: '현재 위치' }}
         />
       ) : null}
     </NaverMapView>

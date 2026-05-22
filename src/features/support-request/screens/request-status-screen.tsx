@@ -544,6 +544,7 @@ function CurrentPhaseCard({ request }: { request: SupportRequestDetail }) {
 function TimelineCard({ request }: { request: SupportRequestDetail }) {
   const currentIdx = SUPPORT_REQUEST_FLOW.indexOf(request.status);
   const [stepCenters, setStepCenters] = useState<Record<number, number>>({});
+  const stepDotRadius = 12;
   const eventByStatus = useMemo(() => {
     const map = new Map<SupportRequestStatus, string>();
     for (const ev of request.events) {
@@ -552,18 +553,28 @@ function TimelineCard({ request }: { request: SupportRequestDetail }) {
     return map;
   }, [request.events]);
   const firstCenter = stepCenters[0];
+  const activeIndex =
+    currentIdx >= 0 && currentIdx < SUPPORT_REQUEST_FLOW.length - 1
+      ? currentIdx + 1
+      : -1;
   const progressTargetIndex =
     currentIdx >= 0
-      ? Math.min(currentIdx + 1, SUPPORT_REQUEST_FLOW.length - 1)
+      ? activeIndex >= 0
+        ? activeIndex
+        : currentIdx
       : -1;
   const progressTargetCenter =
     progressTargetIndex >= 0 ? stepCenters[progressTargetIndex] : undefined;
+  const progressEndCenter =
+    activeIndex >= 0 && progressTargetCenter !== undefined
+      ? progressTargetCenter - stepDotRadius
+      : progressTargetCenter;
   const lastCenter = stepCenters[SUPPORT_REQUEST_FLOW.length - 1];
   const hasBaseRail = firstCenter !== undefined && lastCenter !== undefined;
   const hasProgressRail =
     firstCenter !== undefined &&
-    progressTargetCenter !== undefined &&
-    progressTargetCenter > firstCenter;
+    progressEndCenter !== undefined &&
+    progressEndCenter > firstCenter;
 
   const handleStepLayout = (index: number, event: LayoutChangeEvent) => {
     const { y, height } = event.nativeEvent.layout;
@@ -597,7 +608,7 @@ function TimelineCard({ request }: { request: SupportRequestDetail }) {
               position: 'absolute',
               left: 31,
               top: firstCenter,
-              height: progressTargetCenter - firstCenter,
+              height: progressEndCenter - firstCenter,
               width: 3,
               borderRadius: 2,
               backgroundColor: BRAND_TOKENS.success,
@@ -605,10 +616,6 @@ function TimelineCard({ request }: { request: SupportRequestDetail }) {
           />
         ) : null}
         {SUPPORT_REQUEST_FLOW.map((status, i) => {
-          const activeIndex =
-            currentIdx >= 0 && currentIdx < SUPPORT_REQUEST_FLOW.length - 1
-              ? currentIdx + 1
-              : -1;
           const state: 'done' | 'active' | 'pending' =
             i <= currentIdx ? 'done' : i === activeIndex ? 'active' : 'pending';
           return (
