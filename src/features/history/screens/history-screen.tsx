@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,13 +12,8 @@ import {
 } from '@/components/ui';
 import { SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
-import {
-  SUPPORT_REQUEST_STATUS_LABELS,
-  TERMINAL_REQUEST_STATUSES,
-} from '@/features/support-request/types';
+import { TERMINAL_REQUEST_STATUSES } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
-
-type HistoryFilter = 'active' | 'completed' | 'cancelled';
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -40,40 +34,24 @@ function formatDateTime(value: string) {
 export function HistoryScreen() {
   const router = useRouter();
   const { role } = useAuth();
-  const [selectedFilter, setSelectedFilter] = useState<HistoryFilter>('active');
   const isPassenger = role === 'passenger';
   const { data = [], isLoading, error, refetch } = useSupportRequests(
     isPassenger,
     false,
   );
-  const activeItems = data
-    .filter((item) => !TERMINAL_REQUEST_STATUSES.includes(item.status))
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   const historyItems = data
     .filter((item) => TERMINAL_REQUEST_STATUSES.includes(item.status))
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-  const completedItems = historyItems.filter(
-    (item) => item.status === 'completed' || item.status === 'unavailable',
-  );
-  const cancelledItems = historyItems.filter((item) => item.status === 'cancelled');
-  const filteredItems =
-    selectedFilter === 'active'
-      ? activeItems
-      : selectedFilter === 'completed'
-        ? completedItems
-        : cancelledItems;
-  const selectedEmptyMessage =
-    selectedFilter === 'active'
-      ? '진행 중인 요청이 없습니다'
-      : selectedFilter === 'completed'
-        ? '완료된 이용 내역이 없습니다'
-        : '취소된 이용 내역이 없습니다';
-  const selectedSectionTitle =
-    selectedFilter === 'active'
-      ? '현재 진행 상황'
-      : selectedFilter === 'completed'
-        ? '완료 내역'
-        : '취소 내역';
+
+  const completedCount = historyItems.filter(
+    (item) => item.status === 'completed',
+  ).length;
+  const cancelledCount = historyItems.filter(
+    (item) => item.status === 'cancelled',
+  ).length;
+  const unavailableCount = historyItems.filter(
+    (item) => item.status === 'unavailable',
+  ).length;
 
   if (!isPassenger) {
     return <Redirect href="/(app)/(tabs)" />;
@@ -105,38 +83,32 @@ export function HistoryScreen() {
               color: BRAND_TOKENS.text,
             }}
           >
-            이용 내역
+            완료된 이용 내역
           </Text>
           <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
-            진행 중 {activeItems.length}건 · 완료 {completedItems.length}건
+            종료된 요청 {historyItems.length}건
           </Text>
         </View>
 
-        {!isLoading && !error && (activeItems.length > 0 || historyItems.length > 0) ? (
+        {!isLoading && !error && historyItems.length > 0 ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <SummaryCell
-              count={activeItems.length}
-              label="진행 중"
-              fg={BRAND_TOKENS.brand}
-              bg={BRAND_TOKENS.brandLight}
-              selected={selectedFilter === 'active'}
-              onPress={() => setSelectedFilter('active')}
-            />
-            <SummaryCell
-              count={completedItems.length}
+              count={completedCount}
               label="완료"
               fg={BRAND_TOKENS.success}
               bg={BRAND_TOKENS.successBg}
-              selected={selectedFilter === 'completed'}
-              onPress={() => setSelectedFilter('completed')}
             />
             <SummaryCell
-              count={cancelledItems.length}
+              count={cancelledCount}
               label="취소"
               fg={BRAND_TOKENS.danger}
               bg={BRAND_TOKENS.dangerBg}
-              selected={selectedFilter === 'cancelled'}
-              onPress={() => setSelectedFilter('cancelled')}
+            />
+            <SummaryCell
+              count={unavailableCount}
+              label="지원 불가"
+              fg={BRAND_TOKENS.warning}
+              bg={BRAND_TOKENS.warningBg}
             />
           </View>
         ) : null}
@@ -150,128 +122,89 @@ export function HistoryScreen() {
             }}
           />
         ) : null}
-        {!isLoading && !error && activeItems.length === 0 && historyItems.length === 0 ? (
+        {!isLoading && !error && historyItems.length === 0 ? (
           <EmptyView
-            title="아직 이용 내역이 없어요"
-            description="지원 요청을 시작하면 이곳에서 진행 상황과 완료 내역을 확인할 수 있어요."
+            title="아직 종료된 요청이 없어요"
+            description="진행 중인 요청은 홈 화면에서 확인할 수 있어요."
           />
         ) : null}
 
-        {!isLoading && !error && (activeItems.length > 0 || historyItems.length > 0) ? (
-          <View style={{ gap: 12 }}>
-            <Text
-              style={{
-                fontFamily: pretendard('700'),
-                fontWeight: '700',
-                fontSize: 18,
-                color: BRAND_TOKENS.text,
-              }}
+        <View style={{ gap: 12 }}>
+          {historyItems.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => router.push(`/(app)/support/${item.id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.origin_station_name}에서 ${item.destination_station_name}, ${formatDateTime(item.created_at)}`}
             >
-              {selectedSectionTitle}
-            </Text>
-            {filteredItems.length === 0 ? (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderStyle: 'dashed',
-                  borderColor: BRAND_TOKENS.border,
-                  borderRadius: RADIUS.card,
-                  paddingVertical: 28,
-                  paddingHorizontal: 16,
-                  alignItems: 'center',
-                  backgroundColor: BRAND_TOKENS.surface,
-                }}
-              >
-                <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
-                  {selectedEmptyMessage}
-                </Text>
-              </View>
-            ) : (
-              filteredItems.map((item) => (
-                <RequestHistoryCard
-                  key={item.id}
-                  item={item}
-                  onPress={() =>
-                    router.push(
-                      selectedFilter === 'active'
-                        ? `/(app)/support/status/${item.id}`
-                        : `/(app)/support/${item.id}`,
-                    )
-                  }
-                  subtitle={
-                    selectedFilter === 'active'
-                      ? SUPPORT_REQUEST_STATUS_LABELS[item.status]
-                      : formatDateTime(item.created_at)
-                  }
-                />
-              ))
-            )}
-          </View>
-        ) : null}
+              <GyoumCard padding={16}>
+                <View style={{ gap: 12 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text
+                        style={{
+                          fontFamily: pretendard('600'),
+                          fontWeight: '600',
+                          fontSize: 16,
+                          color: BRAND_TOKENS.text,
+                        }}
+                      >
+                        {item.origin_station_name}{' '}
+                        <Text style={{ color: BRAND_TOKENS.borderStrong }}>
+                          →
+                        </Text>{' '}
+                        {item.destination_station_name}
+                      </Text>
+                      <Text
+                        style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}
+                      >
+                        {formatDateTime(item.created_at)}
+                      </Text>
+                    </View>
+                    <StatusChip status={item.status} size="sm" />
+                  </View>
+                  <View
+                    style={{ height: 1, backgroundColor: BRAND_TOKENS.border }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 12,
+                        color: BRAND_TOKENS.textMuted,
+                      }}
+                    >
+                      {item.support_types
+                        .map((type) => SUPPORT_TYPE_LABELS[type])
+                        .join(', ')}
+                    </Text>
+                    <Text
+                      style={{ fontSize: 12, color: BRAND_TOKENS.borderStrong }}
+                    >
+                      {item.id}
+                    </Text>
+                  </View>
+                </View>
+              </GyoumCard>
+            </Pressable>
+          ))}
+        </View>
       </View>
     </Screen>
-  );
-}
-
-function RequestHistoryCard({
-  item,
-  subtitle,
-  onPress,
-}: {
-  item: NonNullable<ReturnType<typeof useSupportRequests>['data']>[number];
-  subtitle: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.origin_station_name}에서 ${item.destination_station_name}, ${subtitle}`}
-    >
-      <GyoumCard padding={16}>
-        <View style={{ gap: 12 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <View style={{ flex: 1, gap: 4 }}>
-              <Text
-                style={{
-                  fontFamily: pretendard('600'),
-                  fontWeight: '600',
-                  fontSize: 16,
-                  color: BRAND_TOKENS.text,
-                }}
-              >
-                {item.origin_station_name}{' '}
-                <Text style={{ color: BRAND_TOKENS.borderStrong }}>→</Text>{' '}
-                {item.destination_station_name}
-              </Text>
-              <Text style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}>
-                {subtitle}
-              </Text>
-            </View>
-            <StatusChip status={item.status} size="sm" />
-          </View>
-          <View style={{ height: 1, backgroundColor: BRAND_TOKENS.border }} />
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 12,
-                color: BRAND_TOKENS.textMuted,
-              }}
-            >
-              {item.support_types.map((type) => SUPPORT_TYPE_LABELS[type]).join(', ')}
-            </Text>
-          </View>
-        </View>
-      </GyoumCard>
-    </Pressable>
   );
 }
 
@@ -280,24 +213,17 @@ interface SummaryCellProps {
   label: string;
   fg: string;
   bg: string;
-  selected: boolean;
-  onPress: () => void;
 }
 
-function SummaryCell({ count, label, fg, bg, selected, onPress }: SummaryCellProps) {
+function SummaryCell({ count, label, fg, bg }: SummaryCellProps) {
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected }}
+    <View
       style={{
         flex: 1,
         alignItems: 'center',
         gap: 4,
         borderRadius: RADIUS.card,
         backgroundColor: bg,
-        borderWidth: selected ? 2 : 1,
-        borderColor: selected ? fg : 'transparent',
         padding: 12,
       }}
     >
@@ -312,6 +238,6 @@ function SummaryCell({ count, label, fg, bg, selected, onPress }: SummaryCellPro
         {count}
       </Text>
       <Text style={{ fontSize: 12, color: fg }}>{label}</Text>
-    </Pressable>
+    </View>
   );
 }

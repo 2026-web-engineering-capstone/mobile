@@ -85,21 +85,16 @@ function createListItem(
   return {
     id: 'REQ-1',
     status: 'in_progress',
-    origin_station_id: 'STN-HSU',
-    origin_station_name: '한성대입구역',
-    destination_station_id: 'STN-HYE',
-    destination_station_name: '혜화역',
+    origin_station_id: 'STN-ICU',
+    origin_station_name: '인천대입구역',
+    destination_station_id: 'STN-CP',
+    destination_station_name: '센트럴파크역',
     support_types: ['wheelchair'],
-    meeting_point: 'elevator_concourse',
+    meeting_point: 'elevator',
     passenger_name: '테스터',
     assigned_staff_name: '역무원',
-    assigned_staff_id: 'USR-staff-origin',
-    train_number: null,
     train_car_number: null,
     created_at: '2026-04-21T10:00:00Z',
-    boarded_at: null,
-    dropoff_started_at: null,
-    completed_at: null,
     ...overrides,
   };
 }
@@ -133,7 +128,7 @@ function createStaffUser(overrides: Partial<SessionUser> = {}): SessionUser {
     name: '역무원',
     email: 'staff@example.com',
     role: 'staff',
-    station_id: 'STN-HSU',
+    station_id: 'STN-ICU',
     ...overrides,
   };
 }
@@ -164,30 +159,11 @@ test('staff queue classifies origin station active work as origin processing', (
   }
 });
 
-test('staff queue keeps request visible when current staff is assigned directly', () => {
-  const user = createStaffUser({
-    id: 'USR-assigned-staff',
-    station_id: 'STN-HSU',
-  });
-
-  const classification = getStaffQueueItemClassification(
-    createListItem({
-      status: 'assigned',
-      origin_station_id: 'STN-HSU',
-      assigned_staff_id: 'USR-assigned-staff',
-    }),
-    user,
-  );
-
-  assert.equal(classification?.kind, 'origin_processing');
-  assert.equal(classification?.isActionable, true);
-});
-
 test('staff queue classifies destination boarded work as destination handoff', () => {
   const statuses: SupportRequestStatus[] = ['boarded', 'awaiting_dropoff'];
   const user = createStaffUser({
     id: 'USR-staff-destination',
-    station_id: 'STN-HYE',
+    station_id: 'STN-CP',
   });
 
   for (const status of statuses) {
@@ -201,35 +177,26 @@ test('staff queue classifies destination boarded work as destination handoff', (
   }
 });
 
-test('staff queue treats assigned origin boarded work as boarding done only', () => {
+test('staff queue classifies origin boarded work as handoff monitoring', () => {
+  const statuses: SupportRequestStatus[] = ['boarded', 'awaiting_dropoff'];
   const user = createStaffUser();
 
-  const classification = getStaffQueueItemClassification(
-    createListItem({ status: 'boarded' }),
-    user,
-  );
-
-  assert.equal(classification?.kind, 'origin_handoff_monitoring');
-  assert.equal(classification?.label, '승차 완료');
-  assert.equal(classification?.isActionable, false);
-
-  assert.equal(
-    getStaffQueueItemClassification(
-      createListItem({
-        status: 'awaiting_dropoff',
-        assigned_staff_id: 'USR-staff-destination',
-      }),
+  for (const status of statuses) {
+    const classification = getStaffQueueItemClassification(
+      createListItem({ status }),
       user,
-    ),
-    null,
-  );
+    );
+
+    assert.equal(classification?.kind, 'origin_handoff_monitoring');
+    assert.equal(classification?.isActionable, false);
+  }
 });
 
 test('staff queue ignores unrelated stations and terminal items', () => {
   assert.equal(
     getStaffQueueItemClassification(
       createListItem({ status: 'assigned' }),
-      createStaffUser({ id: 'USR-staff-other', station_id: 'STN-OTHER' }),
+      createStaffUser({ station_id: 'STN-OTHER' }),
     ),
     null,
   );
@@ -248,29 +215,6 @@ test('staff queue ignores unrelated stations and terminal items', () => {
   );
 });
 
-test('station staff can still view completed work in history', () => {
-  const request = createRequest({
-    status: 'completed',
-    assigned_staff_id: 'USR-staff-destination',
-  });
-
-  assert.equal(canStaffViewSupportRequest(request, createStaffUser()), false);
-  assert.equal(
-    canStaffViewSupportRequest(
-      request,
-      createStaffUser({ id: 'USR-staff-destination', station_id: 'STN-HYE' }),
-    ),
-    true,
-  );
-  assert.equal(
-    canStaffViewSupportRequest(
-      request,
-      createStaffUser({ id: 'USR-staff-other', station_id: 'STN-OTHER' }),
-    ),
-    false,
-  );
-});
-
 test('assigned origin staff can still view boarded request for handoff continuity', () => {
   const request = createRequest({
     status: 'boarded',
@@ -285,7 +229,7 @@ test('assigned origin staff can still view boarded request for handoff continuit
 test('destination staff manages boarded handoff through completion', () => {
   const user = createStaffUser({
     id: 'USR-staff-destination',
-    station_id: 'STN-HYE',
+    station_id: 'STN-CP',
   });
 
   for (const status of ['boarded', 'awaiting_dropoff'] as SupportRequestStatus[]) {
@@ -319,7 +263,7 @@ test('passenger current location is hidden from non-origin staff and passengers'
       request,
       createStaffUser({
         id: 'USR-staff-destination',
-        station_id: 'STN-HYE',
+        station_id: 'STN-CP',
       }),
     ),
     false,

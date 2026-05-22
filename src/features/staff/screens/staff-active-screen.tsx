@@ -1,14 +1,13 @@
 /**
  * 교움 디자인 시안의 역무원 지원 진행(체크리스트) 화면.
  *
- * 인디고 헤더 카드 + 체크리스트 + 메모 + 모두 체크 시 탑승 정보 입력 CTA.
+ * 인디고 헤더 카드 + 체크리스트 + 메모 + 모두 체크 시 "승차 완료 처리하기" CTA.
  */
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   BottomBar,
   CheckIcon,
@@ -26,50 +25,22 @@ import {
 import { BRAND_TOKENS, FONT_FAMILY } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/api/client';
 import {
-  cacheSupportRequestInList,
   useSupportRequest,
-  useUpdateSupportRequestStatus,
   useUpdateSupportRequestChecklist,
 } from '@/features/support-request/hooks/use-support-requests';
-import { MEETING_POINT_LABELS } from '@/features/support-request/store/use-request-draft-store';
 import {
   canStaffManageSupportRequest,
-  isDestinationHandoffStaff,
   type SupportRequestChecklistItem,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
-import { queryKeys } from '@/lib/query/query-keys';
-
-const CHECKLIST_ACTION_ORDER: Record<string, number> = {
-  'prepare-footboard': 10,
-  'meet-passenger': 20,
-  'verbal-guide': 30,
-  'prepare-pen-paper-or-sign': 40,
-  'guide-elevator-route': 50,
-  'confirm-clear-path': 60,
-  'verify-wheelchair-fit': 70,
-  'confirm-tactile-blocks': 80,
-  'escort-to-platform': 90,
-  'confirm-train-gap': 100,
-};
-
-function sortChecklistItems(items: SupportRequestChecklistItem[]) {
-  return [...items].sort((a, b) => {
-    const aOrder = CHECKLIST_ACTION_ORDER[a.code] ?? 999;
-    const bOrder = CHECKLIST_ACTION_ORDER[b.code] ?? 999;
-    return aOrder - bOrder || a.id - b.id;
-  });
-}
 
 export function StaffActiveScreen() {
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const requestQuery = useSupportRequest(requestId);
   const checklistMutation = useUpdateSupportRequestChecklist(requestId);
-  const statusMutation = useUpdateSupportRequestStatus(requestId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (requestQuery.isLoading) return <LoadingView />;
@@ -78,15 +49,11 @@ export function StaffActiveScreen() {
   }
   const request = requestQuery.data;
 
-  if (isDestinationHandoffStaff(request, user)) {
-    return <Redirect href={`/(app)/support/complete/${request.id}`} />;
-  }
-
   if (!canStaffManageSupportRequest(request, user)) {
     return <ErrorView message="이 요청을 진행할 권한이 없습니다." />;
   }
 
-  const items = sortChecklistItems(request.checklist_items);
+  const items = request.checklist_items;
   const allDone = items.length > 0 && items.every((item) => item.checked);
 
   const toggle = async (item: SupportRequestChecklistItem) => {
@@ -107,34 +74,13 @@ export function StaffActiveScreen() {
   const checkedCount = items.filter((item) => item.checked).length;
   const remaining = items.length - checkedCount;
 
-  const proceedToBoarding = async () => {
-    if (!allDone || statusMutation.isPending) return;
-    setErrorMessage(null);
-
-    try {
-      if (request.status === 'assigned') {
-        await statusMutation.mutateAsync({ status: 'in_progress' });
-      }
-      router.push(`/(app)/support/boarding/${request.id}`);
-    } catch (error) {
-      if (error instanceof ApiError) setErrorMessage(error.message);
-      else setErrorMessage('지원 진행 상태 업데이트에 실패했습니다.');
-    }
-  };
-
-  const handleBackToQueue = () => {
-    cacheSupportRequestInList(queryClient, request);
-    void queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
-    router.replace('/(app)/(tabs)');
-  };
-
   return (
     <Screen background="bg" padded={false} edges={[]}>
       <StatusBar style="dark" />
       <GyoumAppBar
         title="지원 진행 중"
         topInset={insets.top}
-        onBack={handleBackToQueue}
+        onBack={() => router.back()}
       />
       <ScrollView
         style={{ flex: 1 }}
@@ -264,7 +210,7 @@ export function StaffActiveScreen() {
             <Text
               style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: BRAND_TOKENS.textMid }}
             >
-              {MEETING_POINT_LABELS[request.meeting_point] ?? request.meeting_point}
+              {request.meeting_point}
             </Text>
           </View>
         </GyoumCard>
@@ -288,13 +234,11 @@ export function StaffActiveScreen() {
       <BottomBar style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
         <GyoumCTA
           variant="accent"
-          disabled={!allDone || statusMutation.isPending}
-          onPress={proceedToBoarding}
+          disabled={!allDone}
+          onPress={() => router.push(`/(app)/support/boarding/${request.id}`)}
         >
-          {statusMutation.isPending
-            ? '상태 업데이트 중...'
-            : allDone
-            ? '탑승 정보 입력하기'
+          {allDone
+            ? '승차 완료 처리하기'
             : `체크리스트 완료 시 활성화 (${remaining}개 남음)`}
         </GyoumCTA>
       </BottomBar>

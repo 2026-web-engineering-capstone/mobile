@@ -189,7 +189,7 @@ export function AccessibilityScreen() {
                 color: BRAND_TOKENS.text,
               }}
             >
-              한성대입구역 → 혜화역
+              인천대입구역 → 센트럴파크역
             </Text>
             <Text
               style={{

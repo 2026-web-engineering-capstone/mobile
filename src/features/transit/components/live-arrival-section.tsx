@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
-import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
-import { GyoumCard, LineBadge } from '@/components/ui/gyoum-primitives';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { GyoumCard } from '@/components/ui/gyoum-primitives';
 import { useStationArrivals } from '@/features/transit/hooks/use-station-arrivals';
 import type { ArrivalTrain } from '@/features/transit/types';
 
@@ -8,28 +8,15 @@ interface LiveArrivalSectionProps {
   stationName: string;
 }
 
-function groupByLine(trains: ArrivalTrain[]): Map<string, ArrivalTrain[]> {
+function groupByDirection(trains: ArrivalTrain[]): Map<string, ArrivalTrain[]> {
   const groups = new Map<string, ArrivalTrain[]>();
   for (const train of trains) {
-    const key = train.line ?? '노선 미상';
+    const key = train.direction ?? '방면 미상';
     const existing = groups.get(key) ?? [];
     existing.push(train);
     groups.set(key, existing);
   }
   return groups;
-}
-
-function sortLineGroups(
-  groups: Map<string, ArrivalTrain[]>,
-): [string, ArrivalTrain[]][] {
-  return Array.from(groups.entries()).sort(([lineA], [lineB]) =>
-    lineA.localeCompare(lineB, 'ko-KR', { numeric: true }),
-  );
-}
-
-function getArrivalSubLabel(train: ArrivalTrain) {
-  const parts = [train.direction, train.routeLabel, train.trainStatus].filter(Boolean);
-  return parts.join(' · ');
 }
 
 export function LiveArrivalSection({ stationName }: LiveArrivalSectionProps) {
@@ -150,84 +137,56 @@ export function LiveArrivalSection({ stationName }: LiveArrivalSectionProps) {
 
       {!isLoading && !error && data && data.trains.length > 0 ? (
         <View style={{ gap: 12 }}>
-          {sortLineGroups(groupByLine(data.trains)).map(([line, lineTrains]) => {
-            const lineMeta = getLineMeta(line);
-            const lineName = getOfficialLineName(line);
-
-            return (
-              <GyoumCard key={line} padding={16}>
+          {Array.from(groupByDirection(data.trains).entries()).map(
+            ([direction, trains]) => (
+              <GyoumCard key={direction} padding={16}>
                 <View style={{ gap: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <LineBadge char={lineMeta.char} color={lineMeta.color} size={26} />
-                    <Text
-                      style={{
-                        fontFamily: pretendard('700'),
-                        fontWeight: '700',
-                        fontSize: 14,
-                        color: BRAND_TOKENS.text,
-                      }}
-                    >
-                      {lineName}
-                    </Text>
-                  </View>
-                  <View style={{ gap: 2 }}>
-                    {lineTrains.slice(0, 6).map((train, index) => {
-                      const subLabel = getArrivalSubLabel(train);
-
-                      return (
-                        <View
-                          key={`${train.lineId ?? line}-${train.trainNumber ?? index}-${train.destination}-${train.direction}`}
+                  <Text
+                    style={{
+                      fontFamily: pretendard('700'),
+                      fontWeight: '700',
+                      fontSize: 14,
+                      color: BRAND_TOKENS.text,
+                    }}
+                  >
+                    {direction}
+                  </Text>
+                  <View style={{ gap: 6 }}>
+                    {trains.slice(0, 4).map((train, index) => (
+                      <View
+                        key={`${train.trainNumber ?? index}-${train.destination}`}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text
                           style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 12,
-                            paddingVertical: 8,
+                            flex: 1,
+                            fontSize: 14,
+                            color: BRAND_TOKENS.textMid,
                           }}
                         >
-                          <View style={{ flex: 1, gap: 3 }}>
-                            <Text
-                              style={{
-                                fontFamily: pretendard('700'),
-                                fontWeight: '700',
-                                fontSize: 15,
-                                color: BRAND_TOKENS.text,
-                              }}
-                            >
-                              {train.destinationLabel || train.destination || '행선지 미상'}
-                            </Text>
-                            {subLabel ? (
-                              <Text
-                                style={{
-                                  fontFamily: pretendard('500'),
-                                  fontWeight: '500',
-                                  fontSize: 12,
-                                  color: BRAND_TOKENS.textMuted,
-                                }}
-                              >
-                                {subLabel}
-                              </Text>
-                            ) : null}
-                          </View>
-                          <Text
-                            style={{
-                              fontFamily: pretendard('600'),
-                              fontWeight: '600',
-                              fontSize: 14,
-                              color: BRAND_TOKENS.brand,
-                              textAlign: 'right',
-                            }}
-                          >
-                            {train.etaMessage || '도착 정보 없음'}
-                          </Text>
-                        </View>
-                      );
-                    })}
+                          {train.destination || train.trainNumber || '열차'}
+                        </Text>
+                        <Text
+                          style={{
+                            fontFamily: pretendard('600'),
+                            fontWeight: '600',
+                            fontSize: 14,
+                            color: BRAND_TOKENS.brand,
+                          }}
+                        >
+                          {train.etaMessage || '도착 정보 없음'}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
               </GyoumCard>
-            );
-          })}
+            ),
+          )}
         </View>
       ) : null}
     </View>

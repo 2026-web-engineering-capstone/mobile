@@ -5,13 +5,7 @@
  * Staff 액션(수락/체크리스트/승차완료/완료)은 별도 staff 화면들로 분리.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +21,7 @@ import {
   LineBadge,
   LoadingView,
   PageTitle,
+  PulseDot,
   Screen,
   SectionLabel,
   StatusChip,
@@ -59,22 +54,18 @@ import { MEETING_POINT_LABELS, SUPPORT_TYPE_LABELS } from '@/features/support-re
 
 function formatTime(iso: string | null | undefined) {
   if (!iso) return '';
-  const date = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+  const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 const PROGRESS_DESCRIPTIONS: Record<SupportRequestStatus, string> = {
   submitted: '출발 역 역무원이 요청을 확인하고 있어요.',
   assigned: '담당 역무원이 만남 위치로 이동 중입니다.',
-  in_progress: '역무원이 도착해 승강장 이동과 탑승 지원을 진행하고 있어요.',
-  boarded: '승차가 완료되었어요.',
-  awaiting_dropoff: '도착 역에서 하차 지원을 처리하고 있어요.',
-  completed: '하차가 완료되었어요. 좋은 하루 되세요!',
+  in_progress: '역무원이 도착했어요. 승강장으로 이동해주세요.',
+  boarded: '하차 역 역무원이 안내를 받았어요.',
+  awaiting_dropoff: '하차 역 역무원이 곧 도착할 열차를 기다리고 있어요.',
+  completed: '안전한 승하차 지원이 완료되었어요. 좋은 하루 되세요!',
   cancelled: '요청이 취소되었습니다.',
   unavailable: '현재 요청을 지원할 수 없는 상태입니다.',
 };
@@ -121,7 +112,7 @@ export function RequestStatusScreen() {
       <GyoumAppBar
         title="진행 상황"
         topInset={insets.top}
-        onBack={() => router.replace('/(app)/(tabs)/history')}
+        onBack={() => router.back()}
         trailing={<StatusChip status={request.status} size="sm" />}
       />
       <PassengerLikeBody insets={insets} request={request} />
@@ -276,7 +267,7 @@ function SummaryCard({ request }: { request: SupportRequestDetail }) {
             color: BRAND_TOKENS.onBrand60,
           }}
         >
-          지원 요청
+          요청 번호 #{request.id.slice(-6).toUpperCase()}
         </Text>
         <Text
           style={{
@@ -416,7 +407,7 @@ function CurrentPhaseCard({ request }: { request: SupportRequestDetail }) {
               color: BRAND_TOKENS.success,
             }}
           >
-            하차 완료
+            안전하게 도착했어요
           </Text>
         </View>
         <Text
@@ -482,7 +473,7 @@ function CurrentPhaseCard({ request }: { request: SupportRequestDetail }) {
   return (
     <GyoumCard
       padding={18}
-      style={{ backgroundColor: BRAND_TOKENS.successBg, borderColor: BRAND_TOKENS.success }}
+      style={{ backgroundColor: BRAND_TOKENS.brandLight, borderColor: BRAND_TOKENS.brand }}
     >
       <View
         style={{
@@ -492,23 +483,12 @@ function CurrentPhaseCard({ request }: { request: SupportRequestDetail }) {
           marginBottom: 6,
         }}
       >
-        <View
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            backgroundColor: BRAND_TOKENS.success,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <CheckIcon color={BRAND_TOKENS.textOnDark} size={14} />
-        </View>
+        <PulseDot />
         <Text
           style={{
             fontFamily: FONT_FAMILY,
             fontSize: 12,
-            color: BRAND_TOKENS.success,
+            color: BRAND_TOKENS.brand,
             fontWeight: '700',
             letterSpacing: 0.4,
           }}
@@ -543,7 +523,6 @@ function CurrentPhaseCard({ request }: { request: SupportRequestDetail }) {
 
 function TimelineCard({ request }: { request: SupportRequestDetail }) {
   const currentIdx = SUPPORT_REQUEST_FLOW.indexOf(request.status);
-  const [stepCenters, setStepCenters] = useState<Record<number, number>>({});
   const eventByStatus = useMemo(() => {
     const map = new Map<SupportRequestStatus, string>();
     for (const ev of request.events) {
@@ -551,73 +530,21 @@ function TimelineCard({ request }: { request: SupportRequestDetail }) {
     }
     return map;
   }, [request.events]);
-  const firstCenter = stepCenters[0];
-  const progressTargetIndex =
-    currentIdx >= 0
-      ? Math.min(currentIdx + 1, SUPPORT_REQUEST_FLOW.length - 1)
-      : -1;
-  const progressTargetCenter =
-    progressTargetIndex >= 0 ? stepCenters[progressTargetIndex] : undefined;
-  const lastCenter = stepCenters[SUPPORT_REQUEST_FLOW.length - 1];
-  const hasBaseRail = firstCenter !== undefined && lastCenter !== undefined;
-  const hasProgressRail =
-    firstCenter !== undefined &&
-    progressTargetCenter !== undefined &&
-    progressTargetCenter > firstCenter;
-
-  const handleStepLayout = (index: number, event: LayoutChangeEvent) => {
-    const { y, height } = event.nativeEvent.layout;
-    const center = y + height / 2;
-    setStepCenters((prev) => {
-      if (prev[index] === center) return prev;
-      return { ...prev, [index]: center };
-    });
-  };
 
   return (
     <View>
       <SectionLabel>진행 이력</SectionLabel>
-      <GyoumCard padding={0} style={{ position: 'relative' }}>
-        {hasBaseRail ? (
-          <View
-            style={{
-              position: 'absolute',
-              left: 31,
-              top: firstCenter,
-              height: lastCenter - firstCenter,
-              width: 3,
-              borderRadius: 2,
-              backgroundColor: BRAND_TOKENS.border,
-            }}
-          />
-        ) : null}
-        {hasProgressRail ? (
-          <View
-            style={{
-              position: 'absolute',
-              left: 31,
-              top: firstCenter,
-              height: progressTargetCenter - firstCenter,
-              width: 3,
-              borderRadius: 2,
-              backgroundColor: BRAND_TOKENS.success,
-            }}
-          />
-        ) : null}
+      <GyoumCard padding={0}>
         {SUPPORT_REQUEST_FLOW.map((status, i) => {
-          const activeIndex =
-            currentIdx >= 0 && currentIdx < SUPPORT_REQUEST_FLOW.length - 1
-              ? currentIdx + 1
-              : -1;
           const state: 'done' | 'active' | 'pending' =
-            i <= currentIdx ? 'done' : i === activeIndex ? 'active' : 'pending';
+            i < currentIdx ? 'done' : i === currentIdx ? 'active' : 'pending';
           return (
             <TimelineStep
               key={status}
               status={status}
               state={state}
+              isLast={i === SUPPORT_REQUEST_FLOW.length - 1}
               time={formatTime(eventByStatus.get(status) ?? null)}
-              onLayout={(event) => handleStepLayout(i, event)}
             />
           );
         })}
@@ -629,13 +556,13 @@ function TimelineCard({ request }: { request: SupportRequestDetail }) {
 function TimelineStep({
   status,
   state,
+  isLast,
   time,
-  onLayout,
 }: {
   status: SupportRequestStatus;
   state: 'done' | 'active' | 'pending';
+  isLast: boolean;
   time: string;
-  onLayout: (event: LayoutChangeEvent) => void;
 }) {
   const color =
     state === 'done'
@@ -644,16 +571,7 @@ function TimelineStep({
         ? BRAND_TOKENS.brand
         : BRAND_TOKENS.borderStrong;
   return (
-    <View
-      style={{
-        position: 'relative',
-        flexDirection: 'row',
-        gap: 14,
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-      }}
-      onLayout={onLayout}
-    >
+    <View style={{ flexDirection: 'row', gap: 14, paddingHorizontal: 20, paddingVertical: 14 }}>
       <View style={{ alignItems: 'center', position: 'relative' }}>
         <View
           style={{
@@ -680,6 +598,18 @@ function TimelineStep({
             />
           ) : null}
         </View>
+        {!isLast ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: 24,
+              bottom: -14,
+              width: 2,
+              backgroundColor:
+                state === 'pending' ? BRAND_TOKENS.border : color,
+            }}
+          />
+        ) : null}
       </View>
       <View style={{ flex: 1 }}>
         <View
@@ -693,13 +623,8 @@ function TimelineStep({
             style={{
               fontFamily: FONT_FAMILY,
               fontSize: 15,
-              fontWeight: state === 'pending' ? '500' : '700',
-              color:
-                state === 'pending'
-                  ? BRAND_TOKENS.textMuted
-                  : state === 'active'
-                    ? BRAND_TOKENS.brand
-                    : BRAND_TOKENS.text,
+              fontWeight: state === 'active' ? '700' : '500',
+              color: state === 'pending' ? BRAND_TOKENS.textMuted : BRAND_TOKENS.text,
             }}
           >
             {SUPPORT_REQUEST_STATUS_LABELS[status]}

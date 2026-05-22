@@ -9,7 +9,6 @@ import { ScrollView, Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRightIcon,
   BottomBar,
@@ -27,15 +26,9 @@ import {
   StatusChip,
   SUPPORT_TYPE_ICONS,
 } from '@/components/ui';
-import {
-  BRAND_TOKENS,
-  FONT_FAMILY,
-  getStationLineMetas,
-  type LineMeta,
-} from '@/lib/design-tokens';
+import { BRAND_TOKENS, FONT_FAMILY, getLineMeta } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/api/client';
 import {
-  cacheSupportRequestInList,
   useAssignSupportRequest,
   useSupportRequest,
 } from '@/features/support-request/hooks/use-support-requests';
@@ -48,18 +41,15 @@ import {
   canStaffAssignSupportRequest,
   canStaffManageSupportRequest,
   canStaffViewSupportRequest,
-  isDestinationHandoffStaff,
   type SupportRequestDetail,
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
-import { queryKeys } from '@/lib/query/query-keys';
 
 export function RequestDetailScreen() {
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const requestQuery = useSupportRequest(requestId);
   const assignMutation = useAssignSupportRequest();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -80,7 +70,6 @@ export function RequestDetailScreen() {
 
   const canAssign = canStaffAssignSupportRequest(request, user);
   const canManage = canStaffManageSupportRequest(request, user);
-  const canCompleteDropoff = isDestinationHandoffStaff(request, user);
 
   const handleAccept = async () => {
     setErrorMessage(null);
@@ -93,19 +82,13 @@ export function RequestDetailScreen() {
     }
   };
 
-  const handleBackToQueue = () => {
-    cacheSupportRequestInList(queryClient, request);
-    void queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
-    router.replace('/(app)/(tabs)');
-  };
-
   return (
     <Screen background="bg" padded={false} edges={[]}>
       <StatusBar style="dark" />
       <GyoumAppBar
         title="요청 상세"
         topInset={insets.top}
-        onBack={handleBackToQueue}
+        onBack={() => router.back()}
       />
       <ScrollView
         style={{ flex: 1 }}
@@ -127,6 +110,16 @@ export function RequestDetailScreen() {
             }}
           >
             <View>
+              <Text
+                style={{
+                  fontFamily: FONT_FAMILY,
+                  fontSize: 11,
+                  color: BRAND_TOKENS.textMuted,
+                  marginBottom: 4,
+                }}
+              >
+                #{request.id.slice(-6).toUpperCase()}
+              </Text>
               <Text
                 style={{
                   fontFamily: FONT_FAMILY,
@@ -313,13 +306,6 @@ export function RequestDetailScreen() {
           >
             {assignMutation.isPending ? '수락 중...' : '요청 수락'}
           </GyoumCTA>
-        ) : canCompleteDropoff ? (
-          <GyoumCTA
-            variant="success"
-            onPress={() => router.push(`/(app)/support/complete/${request.id}`)}
-          >
-            하차 지원 처리하기
-          </GyoumCTA>
         ) : canManage ? (
           <GyoumCTA
             variant="primary"
@@ -328,7 +314,7 @@ export function RequestDetailScreen() {
             지원 진행하기
           </GyoumCTA>
         ) : (
-          <GyoumCTA variant="ghost" onPress={handleBackToQueue}>
+          <GyoumCTA variant="ghost" onPress={() => router.back()}>
             돌아가기
           </GyoumCTA>
         )}
@@ -346,7 +332,7 @@ function RoutePoint({
   stationName: string;
   stationId: string;
 }) {
-  const lineMetas = getStationLineMetas(stationName);
+  const lineMeta = getLineMeta(stationName);
   return (
     <View
       style={{
@@ -376,7 +362,7 @@ function RoutePoint({
           marginBottom: 2,
         }}
       >
-        <StationLineBadges lines={lineMetas} />
+        <LineBadge char={lineMeta.char} color={lineMeta.color} size={18} />
         <Text
           style={{
             fontFamily: FONT_FAMILY,
@@ -390,21 +376,6 @@ function RoutePoint({
           {stationName}
         </Text>
       </View>
-    </View>
-  );
-}
-
-function StationLineBadges({ lines }: { lines: readonly LineMeta[] }) {
-  return (
-    <View style={{ flexDirection: 'row', gap: 3 }}>
-      {lines.map((line, index) => (
-        <LineBadge
-          key={`${line.char}-${line.color}-${index}`}
-          char={line.char}
-          color={line.color}
-          size={18}
-        />
-      ))}
     </View>
   );
 }

@@ -49,7 +49,7 @@ export const STATUS_TONE: Record<
     badgeTextClassName: 'text-status-boarded dark:text-status-boarded-dark',
   },
   awaiting_dropoff: {
-    label: '하차 처리 중',
+    label: '하차 역 대기',
     chipClassName:
       'bg-status-awaiting-dropoff-bg text-status-awaiting-dropoff dark:bg-status-awaiting-dropoff-bg-dark dark:text-status-awaiting-dropoff-dark',
     dotClassName:
@@ -60,7 +60,7 @@ export const STATUS_TONE: Record<
       'text-status-awaiting-dropoff dark:text-status-awaiting-dropoff-dark',
   },
   completed: {
-    label: '하차 완료',
+    label: '지원 완료',
     chipClassName:
       'bg-status-completed-bg text-status-completed dark:bg-status-completed-bg-dark dark:text-status-completed-dark',
     dotClassName: 'bg-status-completed dark:bg-status-completed-dark',

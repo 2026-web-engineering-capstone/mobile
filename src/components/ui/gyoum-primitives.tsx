@@ -33,16 +33,11 @@ interface LineBadgeProps {
 }
 
 export function LineBadge({
-  char = '역',
-  color = BRAND_TOKENS.textMuted,
+  char = '인',
+  color = BRAND_TOKENS.line1Incheon,
   size = 24,
 }: LineBadgeProps) {
   const inverted = color === 'white' || color === BRAND_TOKENS.onBrand100 || color === '#fff';
-  const labelLength = char.length;
-  const displayLabel = labelLength >= 4 ? `${char.slice(0, 2)}\n${char.slice(2)}` : char;
-  const fontScale =
-    labelLength >= 4 ? 0.26 : labelLength === 3 ? 0.25 : labelLength === 2 ? 0.32 : 0.5;
-  const lineCount = labelLength >= 4 ? 2 : 1;
   return (
     <View
       style={{
@@ -60,18 +55,12 @@ export function LineBadge({
         style={{
           fontFamily: pretendard('700'),
           fontWeight: '700',
-          fontSize: Math.max(5, size * fontScale),
+          fontSize: size * 0.5,
           color: BRAND_TOKENS.onBrand100,
-          lineHeight: Math.max(6, size * (lineCount === 2 ? 0.27 : labelLength >= 2 ? fontScale + 0.06 : 0.6)),
-          textAlign: 'center',
-          letterSpacing: 0,
+          lineHeight: size * 0.6,
         }}
-        adjustsFontSizeToFit
-        allowFontScaling={false}
-        minimumFontScale={0.7}
-        numberOfLines={lineCount}
       >
-        {displayLabel}
+        {char}
       </Text>
     </View>
   );

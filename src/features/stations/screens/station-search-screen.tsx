@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
 import {
   GyoumCard,
   GyoumSearchInput,
@@ -177,8 +177,6 @@ export function StationSearchScreen() {
           </Text>
           {filtered.map((station) => {
             const favorite = isFavoriteStation(station.id);
-            const lineMeta = getLineMeta(station.line);
-            const lineName = getOfficialLineName(station.line);
 
             return (
               <View
@@ -186,11 +184,11 @@ export function StationSearchScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 16,
-                  paddingHorizontal: 12,
-                  paddingVertical: 16,
+                  gap: 12,
+                  paddingHorizontal: 8,
+                  paddingVertical: 12,
                   borderRadius: RADIUS.chip,
-                  minHeight: 66,
+                  minHeight: 44,
                 }}
               >
                 <Pressable
@@ -198,20 +196,20 @@ export function StationSearchScreen() {
                     flex: 1,
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 16,
+                    gap: 12,
                   }}
                   disabled={!canSelectStation}
                   onPress={() => selectStation(station)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${station.name} ${lineName} 선택`}
+                  accessibilityLabel={`${station.name} ${station.line} 선택`}
                 >
-                  <LineBadge color={lineMeta.color} char={lineMeta.char} size={40} />
+                  <LineBadge color={station.line_color} char="인" size={32} />
                   <View style={{ flex: 1 }}>
                     <Text
                       style={{
                         fontFamily: pretendard('600'),
                         fontWeight: '600',
-                        fontSize: 18,
+                        fontSize: 16,
                         color: BRAND_TOKENS.text,
                       }}
                     >
@@ -219,11 +217,11 @@ export function StationSearchScreen() {
                     </Text>
                     <Text
                       style={{
-                        fontSize: 14,
+                        fontSize: 12,
                         color: BRAND_TOKENS.textMuted,
                       }}
                     >
-                      {lineName}
+                      {station.line}
                     </Text>
                   </View>
                 </Pressable>

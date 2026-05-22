@@ -1,7 +1,12 @@
 import type { StationInfo, SubwayLineTheme } from '@/features/home/types';
 
 // 백엔드 STATION_SEED와 정렬된 정적 카탈로그. 위치 기반 최근접 역 계산과 화면
-// 표시에 사용된다. 실시간 도착 API에서 조회 가능한 역만 유지한다.
+// 표시에 사용된다. 새 노선이 추가될 때마다 백엔드 시드와 함께 업데이트한다.
+
+const INCHEON_1_THEME: SubwayLineTheme = {
+  label: '인',
+  colors: { primary: '#3681cb', soft: '#759cce' },
+};
 
 const SEOUL_4_THEME: SubwayLineTheme = {
   label: '4',
@@ -22,6 +27,20 @@ function withLine(
 ): StationInfo[] {
   return stations.map((station) => ({ ...station, line }));
 }
+
+const INCHEON_LINE_1: readonly RawStation[] = [
+  { name: '계양역', previous: '귤현', next: '귤현', latitude: 37.5715, longitude: 126.7382 },
+  { name: '귤현역', previous: '계양', next: '박촌', latitude: 37.5664, longitude: 126.7458 },
+  { name: '박촌역', previous: '귤현', next: '임학', latitude: 37.5567, longitude: 126.753 },
+  { name: '임학역', previous: '박촌', next: '작전', latitude: 37.5437, longitude: 126.7464 },
+  { name: '작전역', previous: '임학', next: '갈산', latitude: 37.5354, longitude: 126.7401 },
+  { name: '갈산역', previous: '작전', next: '지식정보단지', latitude: 37.5283, longitude: 126.7282 },
+  { name: '지식정보단지역', previous: '갈산', next: '인천대입구', latitude: 37.3791, longitude: 126.6502 },
+  { name: '인천대입구역', previous: '지식정보단지', next: '센트럴파크', latitude: 37.3864, longitude: 126.6393 },
+  { name: '센트럴파크역', previous: '인천대입구', next: '국제업무지구', latitude: 37.3942, longitude: 126.6373 },
+  { name: '국제업무지구역', previous: '센트럴파크', next: '송도달빛축제공원', latitude: 37.4011, longitude: 126.6395 },
+  { name: '송도달빛축제공원역', previous: '국제업무지구', next: '국제업무지구', latitude: 37.408, longitude: 126.6322 },
+];
 
 const SEOUL_LINE_4: readonly RawStation[] = [
   { name: '당고개역', previous: '당고개', next: '상계', latitude: 37.6694, longitude: 127.0744 },
@@ -75,9 +94,10 @@ const SEOUL_LINE_4: readonly RawStation[] = [
 ];
 
 export const STATION_CATALOG: readonly StationInfo[] = [
+  ...withLine(INCHEON_LINE_1, INCHEON_1_THEME),
   ...withLine(SEOUL_LINE_4, SEOUL_4_THEME),
 ];
 
 export const DEFAULT_STATION: StationInfo =
-  STATION_CATALOG.find((station) => station.name === '한성대입구역') ??
+  STATION_CATALOG.find((station) => station.name === '인천대입구역') ??
   STATION_CATALOG[0];

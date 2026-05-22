@@ -1,4 +1,4 @@
-import type { SessionUser } from '@/lib/api/types';
+import type { SessionUser, Station } from '@/lib/api/types';
 import type {
   MeetingPoint,
   SupportType,
@@ -65,17 +65,14 @@ export type SupportRequestListItem = {
   meeting_point: MeetingPoint;
   passenger_name: string;
   assigned_staff_name: string | null;
-  assigned_staff_id: string | null;
   train_number: string | null;
   train_car_number: string | null;
   created_at: string;
-  boarded_at: string | null;
-  dropoff_started_at: string | null;
-  completed_at: string | null;
 };
 
 export type SupportRequestDetail = SupportRequestListItem & {
   passenger_id: string;
+  assigned_staff_id: string | null;
   notes: string;
   cancel_reason: CancelReasonCode | null;
   unavailable_reason: UnavailableReasonCode | null;
@@ -90,8 +87,8 @@ export const SUPPORT_REQUEST_STATUS_LABELS: Record<SupportRequestStatus, string>
   assigned: '담당자 배정',
   in_progress: '역무원 도착',
   boarded: '승차 완료',
-  awaiting_dropoff: '하차 처리 중',
-  completed: '하차 완료',
+  awaiting_dropoff: '하차 역 대기',
+  completed: '지원 완료',
   cancelled: '취소됨',
   unavailable: '지원 불가',
 };
@@ -165,15 +162,15 @@ const STAFF_QUEUE_CLASSIFICATIONS: Record<
   },
   destination_handoff: {
     kind: 'destination_handoff',
-    label: '하차 처리 대기',
-    description: '도착역에서 하차 지원을 처리할 요청입니다.',
+    label: '하차역 인계',
+    description: '열차 도착 후 하차 지원을 처리할 요청입니다.',
     isActionable: true,
     sortPriority: 1,
   },
   origin_handoff_monitoring: {
     kind: 'origin_handoff_monitoring',
-    label: '승차 완료',
-    description: '출발역 승차 처리가 완료된 요청입니다.',
+    label: '인계 모니터링',
+    description: '하차 역 인계 진행 상황을 확인하는 요청입니다.',
     isActionable: false,
     sortPriority: 2,
   },
@@ -217,11 +214,11 @@ export function getUnavailableReasonLabel(reason: string | null | undefined) {
 
 export const SUPPORT_REQUEST_STATUS_GUIDES: Record<SupportRequestStatus, string> = {
   submitted: '요청이 정상적으로 접수되었습니다.',
-  assigned: '담당 역무원이 배정되어 만남 위치로 이동 중입니다.',
-  in_progress: '역무원이 도착해 승강장 이동과 탑승 지원을 진행 중입니다.',
+  assigned: '역무원이 배정되어 준비를 시작했습니다.',
+  in_progress: '역무원이 만남 위치로 이동하고 있습니다.',
   boarded: '승차가 완료되었고 열차 정보가 공유됩니다.',
-  awaiting_dropoff: '하차 역에서 지원 처리 중입니다.',
-  completed: '하차 지원이 완료되었습니다.',
+  awaiting_dropoff: '하차 역에서 지원 준비를 하고 있습니다.',
+  completed: '안전한 승하차 지원이 완료되었습니다.',
   cancelled: '요청이 취소되었습니다.',
   unavailable: '현재 요청을 지원할 수 없는 상태입니다.',
 };
@@ -266,7 +263,7 @@ export const STATUS_CHIP_COLORS: Record<
 export function getStaffQueueItemClassification(
   request: Pick<
     SupportRequestListItem,
-    'origin_station_id' | 'destination_station_id' | 'status' | 'assigned_staff_id'
+    'origin_station_id' | 'destination_station_id' | 'status'
   >,
   user: SessionUser | null,
 ) {
@@ -276,13 +273,6 @@ export function getStaffQueueItemClassification(
 
   if (TERMINAL_REQUEST_STATUSES.includes(request.status)) {
     return null;
-  }
-
-  if (request.assigned_staff_id === user.id) {
-    if (STAFF_HANDOFF_STATUSES.includes(request.status)) {
-      return STAFF_QUEUE_CLASSIFICATIONS.origin_handoff_monitoring;
-    }
-    return STAFF_QUEUE_CLASSIFICATIONS.origin_processing;
   }
 
   if (
@@ -299,6 +289,13 @@ export function getStaffQueueItemClassification(
     return STAFF_QUEUE_CLASSIFICATIONS.origin_processing;
   }
 
+  if (
+    user.station_id === request.origin_station_id &&
+    STAFF_HANDOFF_STATUSES.includes(request.status)
+  ) {
+    return STAFF_QUEUE_CLASSIFICATIONS.origin_handoff_monitoring;
+  }
+
   return null;
 }
 
@@ -306,17 +303,6 @@ export function canStaffViewSupportRequestListItem(
   request: SupportRequestListItem,
   user: SessionUser | null,
 ) {
-  if (
-    user &&
-    user.role === 'staff' &&
-    user.station_id &&
-    request.status === 'completed' &&
-    (user.station_id === request.destination_station_id ||
-      request.assigned_staff_id === user.id)
-  ) {
-    return true;
-  }
-
   return getStaffQueueItemClassification(request, user) !== null;
 }
 
@@ -405,3 +391,17 @@ export function isDestinationHandoffStaff(
       STAFF_HANDOFF_STATUSES.includes(request.status),
   );
 }
+
+export const DEMO_STATIONS: Station[] = [
+  { id: 'STN-GY', name: '계양역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-GH', name: '귤현역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-BC', name: '박촌역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-IH', name: '임학역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-JJ', name: '작전역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-GS', name: '갈산역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-JI', name: '지식정보단지역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-ICU', name: '인천대입구역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-CP', name: '센트럴파크역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-IBD', name: '국제업무지구역', line: '인천1호선', line_color: '#3681cb' },
+  { id: 'STN-SD', name: '송도달빛축제공원역', line: '인천1호선', line_color: '#3681cb' },
+];

@@ -22,6 +22,7 @@ type Messaging = {
 function tryLoadMessaging(): Messaging | null {
   if (cachedAvailable === false) return null;
   try {
+    // @ts-expect-error 동적 require — 패키지가 설치되어 있지 않을 수 있음.
     const mod = require('@react-native-firebase/messaging');
     cachedAvailable = true;
     return (mod.default ?? mod)();

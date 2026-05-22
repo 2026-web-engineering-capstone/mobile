@@ -63,22 +63,7 @@ export const BRAND_TOKENS = {
   line2: '#00A84D',
   line3: '#EF7C1C',
   line4: '#00A4E3',
-  line5: '#996CAC',
-  line6: '#CD7C2F',
-  line7: '#747F00',
-  line8: '#E6186C',
   line9: '#BDB092',
-  lineGyeonguiJungang: '#77C4A3',
-  lineGyeongchun: '#0C8E72',
-  lineSuinBundang: '#F5A200',
-  lineSinbundang: '#D31145',
-  lineAirport: '#0090D2',
-  lineUiSinseol: '#B7C450',
-  lineSeohae: '#8FC31F',
-  lineGyeonggang: '#0054A6',
-  lineSillim: '#6789CA',
-  lineGtxA: '#9A6292',
-  lineGimpoGold: '#A17800',
 } as const;
 
 export type BrandTokens = typeof BRAND_TOKENS;
@@ -161,176 +146,20 @@ export const SPACING = {
 export type LineMeta = { readonly color: string; readonly char: string };
 
 const FALLBACK_LINE_META: LineMeta = {
-  color: BRAND_TOKENS.textMuted,
-  char: '역',
+  color: BRAND_TOKENS.line1Incheon,
+  char: '인',
 };
-
-export function getOfficialLineName(line: string | null | undefined): string {
-  if (!line) return '';
-
-  const normalizedLine = line.trim().replace(/^서울(?=[1-9]호선$)/, '');
-
-  if (/^[1-9]$/.test(normalizedLine)) return `${normalizedLine}호선`;
-  if (/^[1-9]호선$/.test(normalizedLine)) return normalizedLine;
-  if (normalizedLine.includes('인천1')) return '인천1호선';
-  if (normalizedLine.includes('인천2')) return '인천2호선';
-  if (normalizedLine.includes('경의중앙')) return '경의중앙선';
-  if (normalizedLine.includes('경춘')) return '경춘선';
-  if (normalizedLine.includes('수인분당')) return '수인분당선';
-  if (normalizedLine.includes('신분당')) return '신분당선';
-  if (normalizedLine.includes('공항')) return '공항철도';
-  if (normalizedLine.includes('우이신설')) return '우이신설선';
-  if (normalizedLine.includes('서해')) return '서해선';
-  if (normalizedLine.includes('경강')) return '경강선';
-  if (normalizedLine.includes('신림')) return '신림선';
-  if (normalizedLine.includes('GTX')) return 'GTX-A';
-  if (normalizedLine.includes('김포')) return '김포골드라인';
-
-  return normalizedLine;
-}
 
 export function getLineMeta(line: string | null | undefined): LineMeta {
-  const officialLineName = getOfficialLineName(line);
-  if (!officialLineName) return FALLBACK_LINE_META;
-
-  if (officialLineName === '인천1호선') return { color: BRAND_TOKENS.line1Incheon, char: '인천1' };
-  if (officialLineName === '인천2호선') return { color: BRAND_TOKENS.line2Incheon, char: '인천2' };
-  if (officialLineName === '1호선') return { color: BRAND_TOKENS.line1, char: '1' };
-  if (officialLineName === '2호선') return { color: BRAND_TOKENS.line2, char: '2' };
-  if (officialLineName === '3호선') return { color: BRAND_TOKENS.line3, char: '3' };
-  if (officialLineName === '4호선') {
+  if (!line) return FALLBACK_LINE_META;
+  if (line.includes('인천1')) return { color: BRAND_TOKENS.line1Incheon, char: '인' };
+  if (line.includes('인천2')) return { color: BRAND_TOKENS.line2Incheon, char: '인' };
+  if (line.startsWith('1호선')) return { color: BRAND_TOKENS.line1, char: '1' };
+  if (line.startsWith('2호선')) return { color: BRAND_TOKENS.line2, char: '2' };
+  if (line.startsWith('3호선')) return { color: BRAND_TOKENS.line3, char: '3' };
+  if (line.startsWith('서울4호선') || line.startsWith('4호선')) {
     return { color: BRAND_TOKENS.line4, char: '4' };
   }
-  if (officialLineName === '5호선') return { color: BRAND_TOKENS.line5, char: '5' };
-  if (officialLineName === '6호선') return { color: BRAND_TOKENS.line6, char: '6' };
-  if (officialLineName === '7호선') return { color: BRAND_TOKENS.line7, char: '7' };
-  if (officialLineName === '8호선') return { color: BRAND_TOKENS.line8, char: '8' };
-  if (officialLineName === '9호선') return { color: BRAND_TOKENS.line9, char: '9' };
-  if (officialLineName === '경의중앙선') {
-    return { color: BRAND_TOKENS.lineGyeonguiJungang, char: '경의중앙' };
-  }
-  if (officialLineName === '경춘선') return { color: BRAND_TOKENS.lineGyeongchun, char: '경춘' };
-  if (officialLineName === '수인분당선') {
-    return { color: BRAND_TOKENS.lineSuinBundang, char: '수인분당' };
-  }
-  if (officialLineName === '신분당선') return { color: BRAND_TOKENS.lineSinbundang, char: '신분당' };
-  if (officialLineName === '공항철도') return { color: BRAND_TOKENS.lineAirport, char: '공항철도' };
-  if (officialLineName === '우이신설선') {
-    return { color: BRAND_TOKENS.lineUiSinseol, char: '우이신설' };
-  }
-  if (officialLineName === '서해선') return { color: BRAND_TOKENS.lineSeohae, char: '서해' };
-  if (officialLineName === '경강선') return { color: BRAND_TOKENS.lineGyeonggang, char: '경강' };
-  if (officialLineName === '신림선') return { color: BRAND_TOKENS.lineSillim, char: '신림' };
-  if (officialLineName === 'GTX-A') return { color: BRAND_TOKENS.lineGtxA, char: 'GTX-A' };
-  if (officialLineName === '김포골드라인') return { color: BRAND_TOKENS.lineGimpoGold, char: '김포골드' };
+  if (line.startsWith('9호선')) return { color: BRAND_TOKENS.line9, char: '9' };
   return FALLBACK_LINE_META;
-}
-
-const STATION_LINE_OVERRIDES: Record<string, readonly string[]> = {
-  공덕: ['5호선', '6호선', '경의중앙선', '공항철도'],
-  서울: ['1호선', '4호선', '경의중앙선', '공항철도'],
-  시청: ['1호선', '2호선'],
-  종로3가: ['1호선', '3호선', '5호선'],
-  동대문: ['1호선', '4호선'],
-  동대문역사문화공원: ['2호선', '4호선', '5호선'],
-  충무로: ['3호선', '4호선'],
-  사당: ['2호선', '4호선'],
-  이촌: ['4호선', '경의중앙선'],
-  삼각지: ['4호선', '6호선'],
-  노원: ['4호선', '7호선'],
-  창동: ['1호선', '4호선'],
-  금정: ['1호선', '4호선'],
-  오이도: ['4호선', '수인분당선'],
-  왕십리: ['2호선', '5호선', '경의중앙선', '수인분당선'],
-  홍대입구: ['2호선', '경의중앙선', '공항철도'],
-  강남: ['2호선', '신분당선'],
-  양재: ['3호선', '신분당선'],
-  선정릉: ['9호선', '수인분당선'],
-  선릉: ['2호선', '수인분당선'],
-  복정: ['8호선', '수인분당선'],
-  모란: ['8호선', '수인분당선'],
-};
-
-const STATION_ID_LINE_SUFFIXES: Record<string, string> = {
-  L1: '1호선',
-  L2: '2호선',
-  L3: '3호선',
-  L4: '4호선',
-  L5: '5호선',
-  L6: '6호선',
-  L7: '7호선',
-  L8: '8호선',
-  L9: '9호선',
-  GJ: '경의중앙선',
-  GC: '경춘선',
-  SB: '수인분당선',
-  SD: '신분당선',
-  AR: '공항철도',
-};
-
-const SUBWAY_ID_LINES: Record<string, string> = {
-  '1001': '1호선',
-  '1002': '2호선',
-  '1003': '3호선',
-  '1004': '4호선',
-  '1005': '5호선',
-  '1006': '6호선',
-  '1007': '7호선',
-  '1008': '8호선',
-  '1009': '9호선',
-  '1063': '경의중앙선',
-  '1065': '공항철도',
-  '1067': '경춘선',
-  '1075': '수인분당선',
-  '1077': '신분당선',
-  '1081': '경강선',
-  '1091': '김포골드라인',
-  '1092': '우이신설선',
-  '1093': '서해선',
-  '1094': '신림선',
-  '1032': 'GTX-A',
-};
-
-function normalizeStationName(value: string) {
-  return value.trim().replace(/\s+/g, '').replace(/역$/, '');
-}
-
-function getLineNameFromStationId(stationId: string | null | undefined) {
-  if (!stationId?.startsWith('STN-')) return null;
-
-  const suffix = stationId.split('-').at(-1);
-  if (suffix && STATION_ID_LINE_SUFFIXES[suffix]) {
-    return STATION_ID_LINE_SUFFIXES[suffix];
-  }
-
-  const subwayId = stationId.split('-')[1];
-  if (subwayId && SUBWAY_ID_LINES[subwayId]) {
-    return SUBWAY_ID_LINES[subwayId];
-  }
-
-  // Legacy seeded IDs without an explicit suffix are Seoul line 4 stations.
-  if (/^STN-[A-Z]{3}$/.test(stationId)) {
-    return '4호선';
-  }
-
-  return null;
-}
-
-export function getStationLineMetas(
-  stationOrLine: string | null | undefined,
-  stationId?: string | null,
-): readonly LineMeta[] {
-  const lineNameFromId = getLineNameFromStationId(stationId);
-  if (lineNameFromId) return [getLineMeta(lineNameFromId)];
-
-  if (!stationOrLine) return [FALLBACK_LINE_META];
-
-  const normalizedStation = normalizeStationName(stationOrLine);
-  const overrideLines = STATION_LINE_OVERRIDES[normalizedStation];
-
-  if (overrideLines) {
-    return overrideLines.map(getLineMeta);
-  }
-
-  return [getLineMeta(stationOrLine)];
 }

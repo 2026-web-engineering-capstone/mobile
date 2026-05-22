@@ -17,7 +17,6 @@
     "check:design": "node ./scripts/check-design.mjs"
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.1.1",
     "@mj-studio/react-native-naver-map": "^2.7.0",
     "@react-native-async-storage/async-storage": "^3.0.2",
     "@react-native-firebase/app": "^21.6.1",
