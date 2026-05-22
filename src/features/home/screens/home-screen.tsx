@@ -21,7 +21,7 @@ import {
   StarIcon,
   StatusChip,
 } from '@/components/ui';
-import { BRAND_TOKENS, RADIUS, getLineMeta, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
 import { typo } from '@/lib/typography';
 import { MapSection } from '@/features/home/components/map-section';
 import {
@@ -177,7 +177,7 @@ export function HomeScreen() {
                     { color: BRAND_TOKENS.textOnDark, opacity: 0.75 },
                   ]}
                 >
-                  {station.line.label}
+                  {getOfficialLineName(station.line.label)}
                 </Text>
               </View>
             </View>
@@ -259,7 +259,7 @@ export function HomeScreen() {
                         {fav.name}
                       </Text>
                       <Text style={[typo('meta'), { color: BRAND_TOKENS.textMuted }]}>
-                        {fav.line}
+                        {getOfficialLineName(fav.line)}
                       </Text>
                     </View>
                     <ChevronRightIcon color={BRAND_TOKENS.textMuted} size={20} />

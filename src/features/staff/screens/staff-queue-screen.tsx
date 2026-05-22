@@ -4,9 +4,10 @@
  * 어두운 근무지 카드(대기/처리중/완료 stat) + 탭(지원 요청/완료) + 요청 카드.
  * 요청 카드 누르면 staff-detail로, 5분 이상 대기 시 긴급 뱃지 표시.
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   BellIcon,
@@ -22,7 +23,12 @@ import {
   StatusChip,
   ArrowRightIcon,
 } from '@/components/ui';
-import { BRAND_TOKENS, FONT_FAMILY, getLineMeta } from '@/lib/design-tokens';
+import {
+  BRAND_TOKENS,
+  FONT_FAMILY,
+  getStationLineMetas,
+  type LineMeta,
+} from '@/lib/design-tokens';
 import {
   MEETING_POINT_LABELS,
   SUPPORT_TYPE_LABELS,
@@ -30,42 +36,209 @@ import {
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import {
   TERMINAL_REQUEST_STATUSES,
+  getStaffQueueItemClassification,
   type SupportRequestListItem,
 } from '@/features/support-request/types';
+import type { SessionUser } from '@/lib/api/types';
 import { useAuth } from '@/providers/auth-provider';
 
 type Tab = 'incoming' | 'done';
+const STAFF_QUEUE_SEEN_STORAGE_KEY = 'gyoum.staffQueue.seenRequestKeys.v1';
 
 function elapsedMinutes(createdAt: string): number {
-  const created = new Date(createdAt).getTime();
+  const created = parseApiDate(createdAt).getTime();
   if (Number.isNaN(created)) return 0;
   return Math.max(0, Math.floor((Date.now() - created) / 60000));
+}
+
+function parseApiDate(iso: string) {
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+}
+
+function formatRelativeCreatedAt(createdAt: string): string {
+  const minutes = elapsedMinutes(createdAt);
+  if (minutes <= 0) return '방금전';
+  if (minutes < 60) return `${minutes}분전`;
+
+  const created = parseApiDate(createdAt);
+  if (Number.isNaN(created.getTime())) return '방금전';
+
+  const dateParts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const sameDay = dateParts.format(created) === dateParts.format(new Date());
+  const time = created.toLocaleTimeString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  if (sameDay) return `오늘 ${time}`;
+
+  return `${created.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  })} ${time}`;
+}
+
+function sortQueueRequests(
+  requests: SupportRequestListItem[],
+) {
+  return [...requests].sort((a, b) => {
+    return parseApiDate(b.created_at).getTime() - parseApiDate(a.created_at).getTime();
+  });
+}
+
+function getStaffStationDisplayName(user: ReturnType<typeof useAuth>['user']) {
+  if (!user?.station_id) return '근무지 미지정';
+  if (user.name.endsWith(' 역무원')) return user.name.replace(/ 역무원$/, '');
+  return user.station_id;
+}
+
+const SUPPORT_TYPE_ORDER = [
+  'footboard',
+  'wheelchair',
+  'companion',
+  'elevator',
+  'vision',
+  'chat',
+] as const;
+
+const BOARDING_REQUEST_BORDER = '#A9DDF8';
+const DROPOFF_REQUEST_BORDER = '#AEE8C8';
+const REQUEST_CARD_MIN_HEIGHT = 196;
+
+function sortSupportTypes(types: SupportRequestListItem['support_types']) {
+  return [...types].sort((a, b) => {
+    const aOrder = SUPPORT_TYPE_ORDER.indexOf(a);
+    const bOrder = SUPPORT_TYPE_ORDER.indexOf(b);
+    return (aOrder === -1 ? 99 : aOrder) - (bOrder === -1 ? 99 : bOrder);
+  });
+}
+
+function shouldShowInIncomingQueue(
+  request: SupportRequestListItem,
+  user: ReturnType<typeof useAuth>['user'],
+) {
+  if (!user || user.role !== 'staff' || !user.station_id) return false;
+  const classification = getStaffQueueItemClassification(request, user);
+  return Boolean(
+    classification?.isActionable && !TERMINAL_REQUEST_STATUSES.includes(request.status),
+  );
+}
+
+function getQueueNoticeKey(
+  request: SupportRequestListItem,
+  user: ReturnType<typeof useAuth>['user'],
+) {
+  const classification = getStaffQueueItemClassification(request, user);
+  if (!classification) return request.id;
+  return `${user?.id ?? 'staff'}:${request.id}:${classification.kind}`;
+}
+
+function getDoneKind(
+  request: SupportRequestListItem,
+  user: SessionUser | null,
+): 'boarding' | 'dropoff' {
+  if (request.status === 'completed') return 'dropoff';
+  if (user?.station_id === request.origin_station_id) return 'boarding';
+  return 'dropoff';
 }
 
 export function StaffQueueScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('incoming');
+  const [seenRequestKeys, setSeenRequestKeys] = useState<Set<string>>(new Set());
   const requestsQuery = useSupportRequests(user?.role === 'staff');
+  const { refetch } = requestsQuery;
+
+  useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(STAFF_QUEUE_SEEN_STORAGE_KEY)
+      .then((value) => {
+        if (!alive || !value) return;
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          setSeenRequestKeys(new Set(parsed.filter((item) => typeof item === 'string')));
+        }
+      })
+      .catch(() => {
+        // 읽음 배지는 보조 UI라 저장소 오류는 화면 동작을 막지 않는다.
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.role === 'staff') {
+        void refetch();
+      }
+    }, [refetch, user?.role]),
+  );
 
   const requests = requestsQuery.data ?? [];
   const incoming = useMemo(
-    () => requests.filter((r) => !TERMINAL_REQUEST_STATUSES.includes(r.status)),
-    [requests],
+    () => {
+      const actionable = requests.filter((request) =>
+        shouldShowInIncomingQueue(request, user),
+      );
+      return sortQueueRequests(actionable);
+    },
+    [requests, user],
   );
   const done = useMemo(
-    () => requests.filter((r) => r.status === 'completed'),
-    [requests],
+    () =>
+      sortQueueRequests(requests.filter((request) => {
+        if (request.status === 'completed') {
+          return (
+            user?.station_id === request.destination_station_id ||
+            request.assigned_staff_id === user?.id
+          );
+        }
+        const classification = getStaffQueueItemClassification(request, user);
+        return classification?.kind === 'origin_handoff_monitoring';
+      })),
+    [requests, user],
   );
 
   const processingCount = incoming.filter((r) =>
     ['assigned', 'in_progress', 'boarded', 'awaiting_dropoff'].includes(r.status),
   ).length;
   const waitingCount = incoming.filter((r) => r.status === 'submitted').length;
+  const unreadIncomingCount = incoming.filter(
+    (request) => !seenRequestKeys.has(getQueueNoticeKey(request, user)),
+  ).length;
+
+  const handleIncomingPress = (request: SupportRequestListItem) => {
+    const noticeKey = getQueueNoticeKey(request, user);
+    setSeenRequestKeys((prev) => {
+      if (prev.has(noticeKey)) return prev;
+      const next = new Set(prev);
+      next.add(noticeKey);
+      void AsyncStorage.setItem(
+        STAFF_QUEUE_SEEN_STORAGE_KEY,
+        JSON.stringify([...next]),
+      );
+      return next;
+    });
+    router.push(`/(app)/support/${request.id}`);
+  };
 
   if (user?.role !== 'staff') {
     return <ErrorView message="역무원 권한이 필요합니다." />;
   }
+
+  const stationDisplayName = getStaffStationDisplayName(user);
+  const stationLineMetas = getStationLineMetas(stationDisplayName, user?.station_id);
 
   return (
     <Screen
@@ -192,7 +365,7 @@ export function StaffQueueScreen() {
                 marginBottom: 14,
               }}
             >
-              <LineBadge char="역" color="white" size={32} />
+              <StationLineBadges lines={stationLineMetas} size={30} />
               <View>
                 <Text
                   style={{
@@ -202,7 +375,7 @@ export function StaffQueueScreen() {
                     color: BRAND_TOKENS.onBrand100,
                   }}
                 >
-                  {user?.station_id ? `${user.station_id} 역` : '근무지 미지정'}
+                  {stationDisplayName}
                 </Text>
                 <Text
                   style={{
@@ -243,7 +416,7 @@ export function StaffQueueScreen() {
             <TabButton
               active={tab === 'incoming'}
               onPress={() => setTab('incoming')}
-              count={incoming.length}
+              count={unreadIncomingCount}
             >
               지원 요청
             </TabButton>
@@ -261,7 +434,8 @@ export function StaffQueueScreen() {
                   <RequestQueueCard
                     key={req.id}
                     request={req}
-                    onPress={() => router.push(`/(app)/support/${req.id}`)}
+                    user={user}
+                    onPress={() => handleIncomingPress(req)}
                   />
                 ))
               )}
@@ -271,7 +445,14 @@ export function StaffQueueScreen() {
               {done.length === 0 ? (
                 <EmptyState text="오늘 완료된 요청이 없습니다" />
               ) : (
-                done.map((req) => <DoneCard key={req.id} request={req} />)
+                done.map((req) => (
+                  <DoneCard
+                    key={req.id}
+                    request={req}
+                    user={user}
+                    onPress={() => router.push(`/(app)/support/${req.id}`)}
+                  />
+                ))
               )}
             </View>
           )}
@@ -393,42 +574,77 @@ function TabButton({
 
 function RequestQueueCard({
   request,
+  user,
   onPress,
 }: {
   request: SupportRequestListItem;
+  user: SessionUser | null;
   onPress: () => void;
 }) {
-  const waitMin = elapsedMinutes(request.created_at);
-  const urgent = waitMin >= 5 && request.status === 'submitted';
-  const originLine = getLineMeta(request.origin_station_name);
-  const destLine = getLineMeta(request.destination_station_name);
+  const originLines = getStationLineMetas(
+    request.origin_station_name,
+    request.origin_station_id,
+  );
+  const destLines = getStationLineMetas(
+    request.destination_station_name,
+    request.destination_station_id,
+  );
+  const classification = getStaffQueueItemClassification(request, user);
+  const isDropoff = classification?.kind === 'destination_handoff';
+  const cardTone = isDropoff ? BRAND_TOKENS.success : BRAND_TOKENS.brand;
+  const cardBorder = isDropoff ? DROPOFF_REQUEST_BORDER : BOARDING_REQUEST_BORDER;
+  const actionTitle = isDropoff ? '하차 지원 필요' : '승차 지원 필요';
+  const locationLabel = isDropoff
+    ? [
+        request.train_number ? `${request.train_number} 열차` : null,
+        request.train_car_number ? `${request.train_car_number}칸` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || '열차 정보 확인 중'
+    : MEETING_POINT_LABELS[request.meeting_point];
   return (
-    <GyoumCard padding={16} onPress={onPress} style={{ position: 'relative' }}>
-      {urgent ? (
-        <View
+    <GyoumCard
+      padding={16}
+      onPress={onPress}
+      style={{
+        position: 'relative',
+        minHeight: REQUEST_CARD_MIN_HEIGHT,
+        borderColor: cardBorder,
+        borderWidth: 2,
+        backgroundColor: BRAND_TOKENS.surface,
+      }}
+    >
+      <View
+        style={{
+          position: 'absolute',
+          top: -6,
+          right: 12,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 999,
+          backgroundColor:
+            request.status === 'submitted'
+              ? BRAND_TOKENS.danger
+              : BRAND_TOKENS.surfaceAlt,
+          borderWidth: request.status === 'submitted' ? 0 : 1,
+          borderColor: BRAND_TOKENS.border,
+        }}
+      >
+        <Text
           style={{
-            position: 'absolute',
-            top: -6,
-            right: 12,
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            borderRadius: 999,
-            backgroundColor: BRAND_TOKENS.danger,
+            color:
+              request.status === 'submitted'
+                ? BRAND_TOKENS.onBrand100
+                : BRAND_TOKENS.textMid,
+            fontFamily: FONT_FAMILY,
+            fontSize: 10,
+            fontWeight: '700',
+            letterSpacing: 0.2,
           }}
         >
-          <Text
-            style={{
-              color: BRAND_TOKENS.onBrand100,
-              fontFamily: FONT_FAMILY,
-              fontSize: 10,
-              fontWeight: '700',
-              letterSpacing: 0.5,
-            }}
-          >
-            {waitMin}분 대기
-          </Text>
-        </View>
-      ) : null}
+          {formatRelativeCreatedAt(request.created_at)}
+        </Text>
+      </View>
       <View
         style={{
           flexDirection: 'row',
@@ -441,12 +657,13 @@ function RequestQueueCard({
           <Text
             style={{
               fontFamily: FONT_FAMILY,
-              fontSize: 11,
-              color: BRAND_TOKENS.textMuted,
-              marginBottom: 2,
+              fontSize: 12,
+              fontWeight: '700',
+              color: cardTone,
+              marginBottom: 4,
             }}
           >
-            #{request.id.slice(-6).toUpperCase()}
+            {actionTitle}
           </Text>
           <Text
             style={{
@@ -459,7 +676,11 @@ function RequestQueueCard({
             {request.passenger_name}
           </Text>
         </View>
-        <StatusChip status={request.status} size="sm" />
+        {isDropoff ? (
+          <QueueStatusPill label="하차 대기" tone="dropoff" />
+        ) : (
+          <StatusChip status={request.status} size="sm" />
+        )}
       </View>
 
       {/* 경로 */}
@@ -475,7 +696,7 @@ function RequestQueueCard({
           marginBottom: 12,
         }}
       >
-        <LineBadge char={originLine.char} color={originLine.color} size={20} />
+        <StationLineBadges lines={originLines} />
         <Text
           style={{
             fontFamily: FONT_FAMILY,
@@ -489,7 +710,7 @@ function RequestQueueCard({
           {request.origin_station_name}
         </Text>
         <ArrowRightIcon color={BRAND_TOKENS.textMuted} size={14} />
-        <LineBadge char={destLine.char} color={destLine.color} size={20} />
+        <StationLineBadges lines={destLines} />
         <Text
           style={{
             fontFamily: FONT_FAMILY,
@@ -506,7 +727,7 @@ function RequestQueueCard({
 
       {/* 지원 유형 */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
-        {request.support_types.map((type) => (
+        {sortSupportTypes(request.support_types).map((type) => (
           <View
             key={type}
             style={{
@@ -530,7 +751,6 @@ function RequestQueueCard({
         ))}
       </View>
 
-      {/* 만남 위치 */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <PinIcon color={BRAND_TOKENS.accent} size={14} />
         <Text
@@ -540,40 +760,147 @@ function RequestQueueCard({
             color: BRAND_TOKENS.textMid,
           }}
         >
-          {MEETING_POINT_LABELS[request.meeting_point]}
+          {locationLabel}
         </Text>
       </View>
     </GyoumCard>
   );
 }
 
-function DoneCard({ request }: { request: SupportRequestListItem }) {
+function QueueStatusPill({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'dropoff';
+}) {
+  const color = tone === 'dropoff' ? BRAND_TOKENS.success : BRAND_TOKENS.brand;
+  const backgroundColor =
+    tone === 'dropoff' ? BRAND_TOKENS.successBg : BRAND_TOKENS.brandLight;
+
   return (
-    <GyoumCard padding={14}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 3,
+        paddingHorizontal: 8,
+        borderRadius: 999,
+        alignSelf: 'flex-start',
+        backgroundColor,
+      }}
+      accessibilityRole="text"
+      accessibilityLabel={`상태: ${label}`}
+    >
+      <View
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: color,
+        }}
+      />
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 12,
+          fontWeight: '500',
+          color,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function formatLineBadgeText(line: LineMeta) {
+  return /^[1-9]$/.test(line.char) ? `${line.char}호선` : line.char;
+}
+
+function StationLineBadges({
+  lines,
+  size = 24,
+}: {
+  lines: readonly LineMeta[];
+  size?: number;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 3 }}>
+      {lines.map((line, index) => (
+        <LineBadge
+          key={`${line.char}-${line.color}-${index}`}
+          char={formatLineBadgeText(line)}
+          color={line.color}
+          size={size}
+        />
+      ))}
+    </View>
+  );
+}
+
+function DoneCard({
+  request,
+  user,
+  onPress,
+}: {
+  request: SupportRequestListItem;
+  user: SessionUser | null;
+  onPress: () => void;
+}) {
+  const doneKind = getDoneKind(request, user);
+  const doneLabel = doneKind === 'boarding' ? '승차 완료' : '하차 완료';
+  const doneColor = doneKind === 'boarding' ? BRAND_TOKENS.brand : BRAND_TOKENS.success;
+  const doneBg = doneKind === 'boarding' ? BRAND_TOKENS.brandLight : BRAND_TOKENS.successBg;
+  return (
+    <GyoumCard padding={14} onPress={onPress}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View
           style={{
             width: 36,
             height: 36,
             borderRadius: 18,
-            backgroundColor: BRAND_TOKENS.successBg,
+            backgroundColor: doneBg,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <CheckIcon color={BRAND_TOKENS.success} size={18} />
+          <CheckIcon color={doneColor} size={18} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text
+          <View
             style={{
-              fontFamily: FONT_FAMILY,
-              fontSize: 14,
-              fontWeight: '600',
-              color: BRAND_TOKENS.text,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              marginBottom: 2,
             }}
           >
-            {request.passenger_name}
-          </Text>
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 14,
+                fontWeight: '600',
+                color: BRAND_TOKENS.text,
+                flexShrink: 1,
+              }}
+              numberOfLines={1}
+            >
+              {request.passenger_name}
+            </Text>
+            <Text
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 11,
+                color: doneColor,
+                fontWeight: '500',
+              }}
+            >
+              {doneLabel}
+            </Text>
+          </View>
           <Text
             style={{
               fontFamily: FONT_FAMILY,
@@ -583,6 +910,19 @@ function DoneCard({ request }: { request: SupportRequestListItem }) {
             numberOfLines={1}
           >
             {request.origin_station_name} → {request.destination_station_name}
+          </Text>
+          <Text
+            style={{
+              marginTop: 2,
+              fontFamily: FONT_FAMILY,
+              fontSize: 11,
+              color: BRAND_TOKENS.textMuted,
+            }}
+            numberOfLines={1}
+          >
+            {formatRelativeCreatedAt(request.created_at)}
+            {request.train_number ? ` · ${request.train_number}` : ''}
+            {request.train_car_number ? ` · ${request.train_car_number}칸` : ''}
           </Text>
         </View>
       </View>

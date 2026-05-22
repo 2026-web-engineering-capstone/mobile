@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import {
+  NaverMapMarkerOverlay,
   NaverMapPolylineOverlay,
   NaverMapView,
   type NaverMapViewRef,
@@ -21,7 +22,6 @@ export function NativeNaverMap({
   station,
 }: NativeNaverMapProps) {
   const mapRef = useRef<NaverMapViewRef>(null);
-  const hasCenteredOnCurrentLocationRef = useRef(false);
 
   const initialCamera = useMemo(
     () => ({
@@ -33,11 +33,7 @@ export function NativeNaverMap({
   );
 
   useEffect(() => {
-    if (
-      !mapRef.current ||
-      !currentLocation ||
-      hasCenteredOnCurrentLocationRef.current
-    ) {
+    if (!mapRef.current || !currentLocation) {
       return;
     }
 
@@ -48,7 +44,6 @@ export function NativeNaverMap({
       duration: 700,
       zoom: DEFAULT_ZOOM,
     });
-    hasCenteredOnCurrentLocationRef.current = true;
   }, [currentLocation]);
 
   return (
@@ -83,6 +78,17 @@ export function NativeNaverMap({
           color={station.line.colors.primary}
           coords={routePath}
           width={5}
+        />
+      ) : null}
+      {currentLocation ? (
+        <NaverMapMarkerOverlay
+          latitude={currentLocation.latitude}
+          longitude={currentLocation.longitude}
+          width={24}
+          height={24}
+          tintColor="#1d7afc"
+          isForceShowIcon
+          caption={{ text: '현재 위치' }}
         />
       ) : null}
     </NaverMapView>

@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
 import {
   GyoumCard,
   GyoumCTA,
@@ -30,72 +30,77 @@ export function FavoritesScreen() {
 
         {favoriteStations.length > 0 ? (
           <GyoumCard padding={0}>
-            {favoriteStations.map((station, index) => (
-              <View key={station.name}>
-                {index > 0 ? (
+            {favoriteStations.map((station, index) => {
+              const lineMeta = getLineMeta(station.line);
+              const lineName = getOfficialLineName(station.line);
+
+              return (
+                <View key={station.id}>
+                  {index > 0 ? (
+                    <View
+                      style={{
+                        height: 1,
+                        backgroundColor: BRAND_TOKENS.border,
+                        marginHorizontal: 20,
+                      }}
+                    />
+                  ) : null}
                   <View
                     style={{
-                      height: 1,
-                      backgroundColor: BRAND_TOKENS.border,
-                      marginHorizontal: 20,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 18,
+                      paddingHorizontal: 22,
+                      paddingVertical: 20,
                     }}
-                  />
-                ) : null}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 16,
-                    paddingHorizontal: 20,
-                    paddingVertical: 16,
-                  }}
-                >
-                  <LineBadge color={station.line_color} char="인" size={32} />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontFamily: pretendard('600'),
-                        fontWeight: '600',
-                        fontSize: 14,
-                        color: BRAND_TOKENS.text,
-                      }}
-                    >
-                      {station.name}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: BRAND_TOKENS.textMuted,
-                      }}
-                    >
-                      {station.line}
-                    </Text>
-                  </View>
-                  <Pressable
-                    style={{
-                      borderRadius: RADIUS.sm,
-                      backgroundColor: BRAND_TOKENS.dangerBg,
-                      paddingHorizontal: 12,
-                      paddingVertical: 6,
-                    }}
-                    onPress={() => removeFavoriteStation(station.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${station.name} 즐겨찾기 삭제`}
                   >
-                    <Text
+                    <LineBadge color={lineMeta.color} char={lineMeta.char} size={40} />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontFamily: pretendard('600'),
+                          fontWeight: '600',
+                          fontSize: 17,
+                          color: BRAND_TOKENS.text,
+                        }}
+                      >
+                        {station.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: BRAND_TOKENS.textMuted,
+                        }}
+                      >
+                        {lineName}
+                      </Text>
+                    </View>
+                    <Pressable
                       style={{
-                        fontFamily: pretendard('500'),
-                        fontWeight: '500',
-                        fontSize: 12,
-                        color: BRAND_TOKENS.danger,
+                        borderRadius: RADIUS.sm,
+                        backgroundColor: BRAND_TOKENS.dangerBg,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
                       }}
+                      onPress={() => removeFavoriteStation(station.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${station.name} 즐겨찾기 삭제`}
                     >
-                      삭제
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={{
+                          fontFamily: pretendard('500'),
+                          fontWeight: '500',
+                          fontSize: 12,
+                          color: BRAND_TOKENS.danger,
+                        }}
+                      >
+                        삭제
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </GyoumCard>
         ) : (
           <GyoumCard padding={32}>

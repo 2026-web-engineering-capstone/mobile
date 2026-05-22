@@ -1,9 +1,14 @@
 export type ArrivalTrain = {
   trainNumber: string | null;
   destination: string;
+  destinationLabel: string;
   etaMessage: string;
   direction: string | null;
+  routeLabel: string | null;
+  trainStatus: string | null;
+  currentStation: string | null;
   line: string | null;
+  lineId: string | null;
 };
 
 export type StationArrivals = {

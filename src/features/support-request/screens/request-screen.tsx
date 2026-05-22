@@ -26,7 +26,7 @@ import {
   ToggleChip,
   SUPPORT_TYPE_ICONS,
 } from '@/components/ui';
-import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getLineMeta } from '@/lib/design-tokens';
+import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getLineMeta, getOfficialLineName } from '@/lib/design-tokens';
 import {
   useCreateSupportRequest,
   useStations,
@@ -294,6 +294,7 @@ function SlotRow({
   placeholder: string;
 }) {
   const lineMeta = station ? getLineMeta(station.line) : null;
+  const lineName = station ? getOfficialLineName(station.line) : '';
   return (
     <Pressable
       onPress={onPress}
@@ -352,7 +353,7 @@ function SlotRow({
                 color: BRAND_TOKENS.textMuted,
               }}
             >
-              {station.line}
+              {lineName}
             </Text>
           </>
         ) : (
@@ -784,6 +785,7 @@ function ReviewRow({
 
 function RouteEnd({ type, station }: { type: '출발' | '도착'; station: Station }) {
   const lineMeta = getLineMeta(station.line);
+  const lineName = getOfficialLineName(station.line);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <View
@@ -816,7 +818,7 @@ function RouteEnd({ type, station }: { type: '출발' | '도착'; station: Stati
         <Text
           style={{ fontFamily: FONT_FAMILY, fontSize: 12, color: BRAND_TOKENS.textMuted }}
         >
-          {station.line}
+          {lineName}
         </Text>
       </View>
       <LineBadge char={lineMeta.char} color={lineMeta.color} size={22} />

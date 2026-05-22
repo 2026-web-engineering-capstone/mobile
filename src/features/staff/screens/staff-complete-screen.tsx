@@ -1,12 +1,12 @@
 /**
- * 교움 디자인 시안의 완료 처리 화면.
+ * 교움 디자인 시안의 하차 완료 처리 화면.
  *
- * 안내한 출구 chip + 결과 메모 + 처리 시간 요약 → completed 상태로 전이.
+ * 하차 확인 + 결과 메모 + 처리 시간 요약 → completed 상태로 전이.
  * 백엔드는 BOARDED → AWAITING_DROPOFF → COMPLETED 전이 규칙이라, 이 화면에서는
  * 먼저 AWAITING_DROPOFF로 보낸 뒤 COMPLETED로 전이한다.
  */
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,8 +31,6 @@ import {
 import { canStaffManageSupportRequest } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
-const EXIT_OPTIONS = ['1번', '2번', '3번', '4번', '5번'];
-
 function formatDuration(startIso: string | null, endIso: string | null) {
   if (!startIso || !endIso) return '-';
   const start = new Date(startIso).getTime();
@@ -50,7 +48,6 @@ export function StaffCompleteScreen() {
   const requestQuery = useSupportRequest(requestId);
   const statusMutation = useUpdateSupportRequestStatus(requestId);
   const [memo, setMemo] = useState('');
-  const [exitNum, setExitNum] = useState('4번');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (requestQuery.isLoading) return <LoadingView />;
@@ -70,13 +67,14 @@ export function StaffCompleteScreen() {
       submittedToAssigned: formatDuration(request.created_at, findEventAt('assigned')),
       assignedToInProgress: formatDuration(findEventAt('assigned'), findEventAt('in_progress')),
       inProgressToBoarded: formatDuration(findEventAt('in_progress'), findEventAt('boarded')),
+      boardedToDropoff: formatDuration(findEventAt('boarded'), new Date().toISOString()),
       total: formatDuration(request.created_at, new Date().toISOString()),
     };
   }, [request]);
 
   const handleComplete = async () => {
     setErrorMessage(null);
-    const note = [memo.trim(), `${exitNum} 출구 안내`].filter(Boolean).join(' · ');
+    const note = memo.trim() || '하차 지원 완료';
     try {
       // BOARDED 상태라면 먼저 AWAITING_DROPOFF로 전이.
       if (request.status === 'boarded') {
@@ -89,7 +87,7 @@ export function StaffCompleteScreen() {
       router.replace('/(app)/(tabs)');
     } catch (error) {
       if (error instanceof ApiError) setErrorMessage(error.message);
-      else setErrorMessage('완료 처리에 실패했습니다.');
+      else setErrorMessage('하차 완료 처리에 실패했습니다.');
     }
   };
 
@@ -97,7 +95,7 @@ export function StaffCompleteScreen() {
     <Screen background="bg" padded={false} edges={[]}>
       <StatusBar style="dark" />
       <GyoumAppBar
-        title="지원 완료 처리"
+        title="하차 완료 처리"
         topInset={insets.top}
         onBack={() => router.back()}
       />
@@ -107,46 +105,57 @@ export function StaffCompleteScreen() {
           paddingHorizontal: 20,
           paddingTop: 8,
           paddingBottom: 140,
+          gap: 16,
         }}
         keyboardShouldPersistTaps="handled"
       >
-        <PageTitle sub="지원 결과를 기록하고 마무리합니다.">
-          지원이 완료되었나요?
+        <PageTitle sub="도착역 하차 지원 결과를 기록하고 마무리합니다.">
+          하차가 완료되었나요?
         </PageTitle>
 
-        <SectionLabel>안내한 출구</SectionLabel>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
-          {EXIT_OPTIONS.map((n) => {
-            const selected = exitNum === n;
-            return (
-              <Pressable
-                key={n}
-                onPress={() => setExitNum(n)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 14,
-                  borderRadius: RADIUS.chip,
-                  backgroundColor: selected ? BRAND_TOKENS.accent : BRAND_TOKENS.surface,
-                  borderWidth: 1.5,
-                  borderColor: selected ? BRAND_TOKENS.accent : BRAND_TOKENS.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: FONT_FAMILY,
-                    fontSize: 15,
-                    fontWeight: '600',
-                    color: selected ? BRAND_TOKENS.onBrand100 : BRAND_TOKENS.text,
-                  }}
-                >
-                  {n}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <GyoumCard
+          padding={16}
+          style={{ backgroundColor: BRAND_TOKENS.brandLight, borderColor: BRAND_TOKENS.brand }}
+        >
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 12,
+              fontWeight: '700',
+              color: BRAND_TOKENS.brand,
+              marginBottom: 8,
+            }}
+          >
+            하차 처리 대기
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 18,
+              fontWeight: '700',
+              color: BRAND_TOKENS.text,
+              marginBottom: 6,
+            }}
+          >
+            {request.passenger_name}
+          </Text>
+          <Text style={{ fontFamily: FONT_FAMILY, fontSize: 14, color: BRAND_TOKENS.textMid }}>
+            {request.origin_station_name} → {request.destination_station_name}
+          </Text>
+          {request.train_number || request.train_car_number ? (
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              {request.train_number ? <InfoPill label="열차" value={request.train_number} /> : null}
+              {request.train_car_number ? <InfoPill label="칸" value={request.train_car_number} /> : null}
+            </View>
+          ) : null}
+        </GyoumCard>
+
+        <SectionLabel>하차 처리 확인</SectionLabel>
+        <GyoumCard padding={0}>
+          <DropoffCheckRow text="인계받은 열차 번호와 칸 번호를 확인했습니다." />
+          <DropoffCheckRow text="승객을 확인하고 열차에서 안전하게 내릴 수 있도록 지원했습니다." />
+          <DropoffCheckRow text="승강장 이동 동선과 다음 이동 방향을 함께 확인했습니다." last />
+        </GyoumCard>
 
         <SectionLabel>결과 메모 (선택)</SectionLabel>
         <TextInput
@@ -195,6 +204,7 @@ export function StaffCompleteScreen() {
           <TimeRow label="요청 → 배정" value={durations.submittedToAssigned} />
           <TimeRow label="배정 → 현장 도착" value={durations.assignedToInProgress} />
           <TimeRow label="현장 → 승차" value={durations.inProgressToBoarded} />
+          <TimeRow label="승차 완료 → 하차 처리" value={durations.boardedToDropoff} />
           <TimeRow label="총 지원 시간" value={durations.total} bold />
         </GyoumCard>
 
@@ -222,10 +232,79 @@ export function StaffCompleteScreen() {
           disabled={statusMutation.isPending}
           leadingIcon={<CheckIcon color={BRAND_TOKENS.onBrand100} size={20} />}
         >
-          {statusMutation.isPending ? '처리 중...' : '완료 처리'}
+          {statusMutation.isPending ? '처리 중...' : '하차 완료 처리'}
         </GyoumCTA>
       </BottomBar>
     </Screen>
+  );
+}
+
+function InfoPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: RADIUS.pill,
+        backgroundColor: BRAND_TOKENS.surface,
+        borderWidth: 1,
+        borderColor: BRAND_TOKENS.border,
+      }}
+    >
+      <Text style={{ fontFamily: FONT_FAMILY, fontSize: 11, color: BRAND_TOKENS.textMuted }}>
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 13,
+          fontWeight: '700',
+          color: BRAND_TOKENS.text,
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function DropoffCheckRow({ text, last }: { text: string; last?: boolean }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: BRAND_TOKENS.border,
+      }}
+    >
+      <View
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          backgroundColor: BRAND_TOKENS.success,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <CheckIcon color={BRAND_TOKENS.onBrand100} size={13} />
+      </View>
+      <Text
+        style={{
+          flex: 1,
+          fontFamily: FONT_FAMILY,
+          fontSize: 14,
+          color: BRAND_TOKENS.text,
+          lineHeight: 20,
+        }}
+      >
+        {text}
+      </Text>
+    </View>
   );
 }
 

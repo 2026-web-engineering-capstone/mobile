@@ -1637,7 +1637,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@expo/vector-icons@npm:^15.0.2":
+"@expo/vector-icons@npm:^15.0.2, @expo/vector-icons@npm:^15.1.1":
   version: 15.1.1
   resolution: "@expo/vector-icons@npm:15.1.1"
   peerDependencies:
@@ -5472,6 +5472,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "gyoum-mobile@workspace:."
   dependencies:
+    "@expo/vector-icons": "npm:^15.1.1"
     "@mj-studio/react-native-naver-map": "npm:^2.7.0"
     "@react-native-async-storage/async-storage": "npm:^3.0.2"
     "@react-native-firebase/app": "npm:^21.6.1"

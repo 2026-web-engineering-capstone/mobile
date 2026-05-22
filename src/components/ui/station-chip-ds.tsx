@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { BRAND_TOKENS, RADIUS, getLineMeta, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
 import { LineBadge } from './gyoum-primitives';
 import { CheckIcon } from './icons';
 import type { Station } from '@/lib/api/types';
@@ -27,24 +27,26 @@ export function StationChipDS({
   size = 'md',
 }: StationChipDSProps) {
   const lineMeta = getLineMeta(station.line);
+  const lineName = getOfficialLineName(station.line);
   const padding = size === 'sm' ? 12 : 16;
   const fontSize = size === 'sm' ? 14 : 16;
+  const badgeSize = size === 'sm' ? 32 : 36;
 
   const content = (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
         paddingHorizontal: padding,
-        paddingVertical: size === 'sm' ? 10 : 14,
+        paddingVertical: size === 'sm' ? 13 : 18,
         borderRadius: RADIUS.chip,
         backgroundColor: selected ? BRAND_TOKENS.brandLight : BRAND_TOKENS.surfaceAlt,
         borderWidth: selected ? 2 : 1,
         borderColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.border,
       }}
     >
-      <LineBadge char={lineMeta.char} color={lineMeta.color} size={28} />
+      <LineBadge char={lineMeta.char} color={lineMeta.color} size={badgeSize} />
       <View style={{ flex: 1 }}>
         {label ? (
           <Text
@@ -78,7 +80,7 @@ export function StationChipDS({
             fontWeight: '500',
           }}
         >
-          {station.line}
+          {lineName}
         </Text>
       </View>
       {selected ? (
@@ -103,7 +105,7 @@ export function StationChipDS({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${station.name} ${station.line}`}
+      accessibilityLabel={`${station.name} ${lineName}`}
       accessibilityState={{ selected: !!selected }}
     >
       {content}

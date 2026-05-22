@@ -1,4 +1,5 @@
 import {
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
@@ -22,9 +23,53 @@ import {
   SUPPORT_REQUEST_FLOW,
   TERMINAL_REQUEST_STATUSES,
   type CancelReasonCode,
+  type SupportRequestDetail,
+  type SupportRequestListItem,
   type SupportRequestStatus,
   type UnavailableReasonCode,
 } from '@/features/support-request/types';
+
+function toSupportRequestListItem(
+  request: SupportRequestDetail,
+): SupportRequestListItem {
+  return {
+    id: request.id,
+    status: request.status,
+    origin_station_id: request.origin_station_id,
+    origin_station_name: request.origin_station_name,
+    destination_station_id: request.destination_station_id,
+    destination_station_name: request.destination_station_name,
+    support_types: request.support_types,
+    meeting_point: request.meeting_point,
+    passenger_name: request.passenger_name,
+    assigned_staff_name: request.assigned_staff_name,
+    assigned_staff_id: request.assigned_staff_id,
+    train_number: request.train_number,
+    train_car_number: request.train_car_number,
+    created_at: request.created_at,
+    boarded_at: request.boarded_at,
+    dropoff_started_at: request.dropoff_started_at,
+    completed_at: request.completed_at,
+  };
+}
+
+export function cacheSupportRequestInList(
+  queryClient: QueryClient,
+  request: SupportRequestDetail,
+) {
+  const listItem = toSupportRequestListItem(request);
+
+  queryClient.setQueryData(
+    queryKeys.supportRequests.all,
+    (existing: SupportRequestListItem[] | undefined) => {
+      if (!existing) return [listItem];
+      if (existing.some((item) => item.id === listItem.id)) {
+        return existing.map((item) => (item.id === listItem.id ? listItem : item));
+      }
+      return [listItem, ...existing];
+    },
+  );
+}
 
 export function useStations(query?: string) {
   return useQuery({
@@ -82,6 +127,7 @@ export function useCancelSupportRequest(requestId: string) {
     mutationFn: (reason: CancelReasonCode) => cancelSupportRequest(requestId, reason),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
+      cacheSupportRequestInList(queryClient, updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
@@ -94,6 +140,7 @@ export function useAssignSupportRequest() {
     mutationFn: (requestId: string) => assignSupportRequest(requestId),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(updated.id), updated);
+      cacheSupportRequestInList(queryClient, updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
@@ -108,6 +155,7 @@ export function useUpdateSupportRequestChecklist(requestId: string) {
     ) => updateSupportRequestChecklist(requestId, items),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
+      cacheSupportRequestInList(queryClient, updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
@@ -135,6 +183,7 @@ export function useUpdateSupportRequestStatus(requestId: string) {
       }),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
+      cacheSupportRequestInList(queryClient, updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
@@ -148,6 +197,7 @@ export function useUploadSupportRequestCurrentLocation(requestId: string) {
       uploadSupportRequestCurrentLocation(requestId, payload),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
+      cacheSupportRequestInList(queryClient, updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
@@ -161,6 +211,7 @@ export function useMarkSupportRequestUnavailable(requestId: string) {
       markSupportRequestUnavailable(requestId, reason),
     onSuccess: async (updated) => {
       queryClient.setQueryData(queryKeys.supportRequests.detail(requestId), updated);
+      cacheSupportRequestInList(queryClient, updated);
       await queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
     },
   });
