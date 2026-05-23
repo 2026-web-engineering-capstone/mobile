@@ -13,14 +13,65 @@ yarn install              # 의존성 설치
 yarn prebuild             # 네이티브 프로젝트 생성
 yarn prebuild:clean       # 네이티브 프로젝트 초기화 후 재생성 (plugin/config 변경 시)
 yarn start                # Metro 번들러 실행 (localhost dev-client 모드)
-yarn start:clear          # Metro 캐시 초기화 후 실행
+yarn start:clear          # Metro 캐시 초기화 후 실행 (캐시 문제 의심 시)
 yarn start:tunnel         # 실기기용 tunnel 모드
-yarn ios                  # iOS 빌드 (Metro 별도 실행 필요, --no-bundler)
+yarn ios                  # iOS 빌드 (--no-bundler, 현재 실행 중인 Metro에 연결)
 yarn android              # Android 빌드
 yarn typecheck            # TypeScript 타입 검사 (tsc --noEmit)
 ```
 
-개발 시 `yarn start` → 새 터미널에서 `yarn ios` 순서로 실행한다. 네이티브 의존성이나 `app.config.ts` 변경 후에는 `yarn prebuild:clean && yarn ios`가 필요하다.
+## 개발 실행 순서
+
+### 권장 순서 (iOS Simulator)
+
+```bash
+yarn install
+yarn prebuild
+yarn start:clear          # 터미널 1: Metro 실행
+# 새 터미널에서:
+yarn ios                  # 터미널 2: iOS 빌드 및 실행
+```
+
+### Android 에뮬레이터
+
+처음 설치하거나 네이티브 변경 후:
+```bash
+yarn android              # 빌드 + 설치 + Metro 자동 시작
+```
+
+앱이 이미 설치된 경우:
+```bash
+yarn start:clear          # Metro만 실행, 에뮬레이터에서 자동 연결
+```
+
+#### Windows 전용 — JAVA_HOME 설정 (매 터미널 세션마다 또는 시스템 환경변수에 영구 등록)
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+```
+
+> Mac에서는 Android Studio가 JAVA_HOME을 자동으로 처리하므로 불필요하다.
+
+### 네이티브 코드 변경 후 (plugin/config/의존성 변경 시)
+
+```bash
+yarn prebuild:clean
+yarn ios    # 또는 yarn android
+```
+
+### 실기기 개발
+
+```bash
+yarn start:tunnel         # tunnel 모드로 Metro 실행
+```
+
+## CNG 원칙
+
+- 네이티브 설정의 source of truth는 `app.config.ts`와 config plugin이다.
+- `ios/`, `android/`는 `expo prebuild`로 재생성되는 산출물이므로 직접 수정하지 않는다.
+- 네이티브 라이브러리 추가, plugin 변경, `app.config.ts` 변경 후에는 `prebuild:clean` 후 재빌드가 필요하다.
+- 시뮬레이터 기본 흐름은 localhost, 실기기 기본 흐름은 tunnel이다.
 
 ## Architecture
 
@@ -61,8 +112,11 @@ HeroUI Native 컴포넌트 + Uniwind(TailwindCSS v4 for RN). `className` prop으
 
 ## Environment Variables
 
-- `EXPO_PUBLIC_API_BASE_URL` - API 서버 주소
-- `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID` - 네이버 지도 Mobile App 클라이언트 ID (변경 시 `prebuild:clean` 필요)
+- `EXPO_PUBLIC_API_BASE_URL` - API 서버 주소 (Android 에뮬레이터: `http://10.0.2.2:8000`)
+- `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID` - 네이버 지도 Mobile App 클라이언트 ID
+  - NCP(Naver Cloud Platform) → AI·NAVER API → Application에서 Mobile Dynamic Map 키 발급
+  - **값 변경 시 반드시 `yarn prebuild:clean` 후 재빌드 필요** (네이티브 빌드에 포함)
+  - 키 미설정 시 지도 영역에 안내 문구 표시 (앱 나머지 기능은 정상 동작)
 
 ## Product Requirements (Manyfast PRD)
 
