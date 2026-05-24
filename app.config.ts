@@ -91,6 +91,8 @@ const config: ExpoConfig = {
     // ObjC pod인 GoogleUtilities를 import하려면 modular_headers 필요.
     // expo-build-properties 55에는 useModularHeaders 옵션이 없어 자체 plugin으로 처리.
     './plugins/with-use-modular-headers',
+    './plugins/with-async-storage-local-maven',
+    './plugins/with-firebase-channel-fix',
     [
       'expo-notifications',
       {

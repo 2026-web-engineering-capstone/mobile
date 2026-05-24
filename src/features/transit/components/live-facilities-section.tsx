@@ -1,12 +1,27 @@
+import type { ComponentType } from 'react';
 import { Text, View } from 'react-native';
 import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
 import { GyoumCard } from '@/components/ui/gyoum-primitives';
+import {
+  AccessibleToiletIcon,
+  ElevatorIcon,
+  EscalatorIcon,
+  WheelchairIcon,
+} from '@/components/ui/icons';
 import { useStationFacilities } from '@/features/transit/hooks/use-station-facilities';
 import {
-  getFacilityEmoji,
   getFacilityLabel,
   OPERATIONAL_STATUS_LABEL,
 } from '@/features/transit/types';
+
+type IconProps = { color?: string; size?: number };
+
+const FACILITY_ICON_MAP: Record<string, ComponentType<IconProps>> = {
+  elevator: ElevatorIcon,
+  escalator: EscalatorIcon,
+  accessible_toilet: AccessibleToiletIcon,
+  wheelchair_lift: WheelchairIcon,
+};
 
 interface LiveFacilitiesSectionProps {
   stationName: string;
@@ -121,24 +136,18 @@ export function LiveFacilitiesSection({
         >
           {data.facilities.map((facility, index) => {
             const operational = facility.operationalStatus === 'operational';
-            const outOfService =
-              facility.operationalStatus === 'out_of_service';
             const badgeBg = operational
               ? BRAND_TOKENS.successBg
-              : outOfService
-                ? BRAND_TOKENS.dangerBg
-                : BRAND_TOKENS.surfaceAlt;
+              : BRAND_TOKENS.surfaceAlt;
             const badgeFg = operational
               ? BRAND_TOKENS.success
-              : outOfService
-                ? BRAND_TOKENS.danger
-                : BRAND_TOKENS.textMuted;
+              : BRAND_TOKENS.textMuted;
             return (
               <View
                 key={`${facility.facilityType}-${index}`}
                 style={{ flex: 1, minWidth: '48%' }}
               >
-                <GyoumCard padding={12} accent={outOfService}>
+                <GyoumCard padding={12}>
                   <View style={{ gap: 4 }}>
                     <View
                       style={{
@@ -147,9 +156,12 @@ export function LiveFacilitiesSection({
                         justifyContent: 'space-between',
                       }}
                     >
-                      <Text style={{ fontSize: 20 }}>
-                        {getFacilityEmoji(facility.facilityType)}
-                      </Text>
+                      {(() => {
+                        const Icon = FACILITY_ICON_MAP[facility.facilityType];
+                        return Icon ? (
+                          <Icon color={BRAND_TOKENS.brand} size={22} />
+                        ) : null;
+                      })()}
                       <View
                         style={{
                           paddingHorizontal: 8,

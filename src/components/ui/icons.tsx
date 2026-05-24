@@ -343,6 +343,48 @@ export function SearchIcon({ color = DEFAULT_COLOR, size = 20 }: IconProps) {
   );
 }
 
+export function EscalatorIcon({ color = DEFAULT_COLOR, size = 22 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5 19H9V15H13V11H17V7"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M15 5h4v4"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function AccessibleToiletIcon({ color = DEFAULT_COLOR, size = 22 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="5" r="2" stroke={color} strokeWidth="1.6" />
+      <Path
+        d="M8 9h8l-1 5H9L8 9z"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M10 14l-1 5M14 14l1 5"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 /** SupportType별 아이콘 컴포넌트 매핑. */
 export const SUPPORT_TYPE_ICONS = {
   footboard: FootboardIcon,

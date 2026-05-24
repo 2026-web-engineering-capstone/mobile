@@ -44,11 +44,17 @@ yarn android              # 빌드 + 설치 + Metro 자동 시작
 yarn start:clear          # Metro만 실행, 에뮬레이터에서 자동 연결
 ```
 
-#### Windows 전용 — JAVA_HOME 설정 (매 터미널 세션마다 또는 시스템 환경변수에 영구 등록)
+#### Windows 전용 — JAVA_HOME + ANDROID_HOME 설정 (매 터미널 세션마다 또는 시스템 환경변수에 영구 등록)
+
+**반드시 ANDROID_HOME까지 설정해야 Expo가 `adb reverse`를 실행할 수 있다.**
+`adb reverse tcp:8081 tcp:8081` 없이는 에뮬레이터가 Metro(localhost:8081)에 연결되지 않는다.
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+$env:ANDROID_HOME = "C:\Users\sushi\AppData\Local\Android\Sdk"
+$env:PATH = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\emulator;$env:PATH"
+$env:EXPO_PACKAGER_PROXY_URL = "http://localhost:8081"
+corepack yarn expo start --dev-client --localhost --clear
 ```
 
 > Mac에서는 Android Studio가 JAVA_HOME을 자동으로 처리하므로 불필요하다.

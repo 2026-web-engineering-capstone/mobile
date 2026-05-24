@@ -27,65 +27,114 @@ Expo Router 기반의 React Native 앱입니다. 로컬 개발 표준은 `Expo G
 
 ## 환경 변수
 
-- NAVER 지도는 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`를 사용합니다.
-- 값은 NAVER Cloud의 `Mobile App`용 지도 키여야 하며, 웹용 `PAGE_URL` 설정은 더 이상 사용하지 않습니다.
-- 기존 `EXPO_PUBLIC_NAVER_MAP_PAGE_URL`만 남아 있어도 `ncpKeyId`를 임시 호환 처리하지만, 새 기준은 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`입니다.
+`.env` 파일을 직접 생성하거나 `.env.example`을 복사해서 사용합니다.
+
+```
+EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8000     # Android 에뮬레이터
+# EXPO_PUBLIC_API_BASE_URL=http://localhost:8000  # iOS 시뮬레이터
+EXPO_PUBLIC_NAVER_MAP_CLIENT_ID=<네이버 Mobile App 키>
+```
+
+- NAVER 지도는 `EXPO_PUBLIC_NAVER_MAP_CLIENT_ID`를 사용합니다. 값은 NAVER Cloud의 `Mobile App`용 지도 키여야 합니다.
 - 키를 바꾼 뒤에는 `yarn prebuild:clean` 후 development build를 다시 생성해야 합니다.
 
-## 개발 실행
+---
 
-### 1. 의존성 설치
+## 개발 환경 설정 (최초 1회)
+
+### macOS
+
+Android 에뮬레이터를 사용할 경우 `~/.zshrc` (또는 `~/.bash_profile`)에 추가:
+
+```bash
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH
+```
+
+iOS 시뮬레이터만 쓴다면 별도 설정 불필요합니다.
+
+### Windows
+
+`ANDROID_HOME`과 `JAVA_HOME`을 시스템 환경 변수에 **영구 등록**해야 합니다.  
+등록하지 않으면 Expo가 `adb reverse`를 실행할 수 없어 에뮬레이터가 Metro에 연결되지 않습니다.
+
+**Windows 검색 → "시스템 환경 변수 편집" → 환경 변수** 에서:
+
+| 변수 | 값 |
+|---|---|
+| `JAVA_HOME` | `C:\Program Files\Android\Android Studio\jbr` |
+| `ANDROID_HOME` | `C:\Users\{사용자명}\AppData\Local\Android\Sdk` |
+
+**Path** 에 아래 항목 추가:
+
+```
+%JAVA_HOME%\bin
+%ANDROID_HOME%\platform-tools
+%ANDROID_HOME%\emulator
+```
+
+> 설정 후 터미널을 새로 열어야 적용됩니다. `adb version`으로 확인하세요.
+
+---
+
+## 개발 명령어
+
+| 명령어 | 설명 |
+|---|---|
+| `yarn install` | 의존성 설치 |
+| `yarn prebuild` | 네이티브 프로젝트 생성 |
+| `yarn prebuild:clean` | 네이티브 프로젝트 초기화 후 재생성 |
+| `yarn start` | Metro 번들러 실행 |
+| `yarn start:clear` | Metro 캐시 초기화 후 실행 (연결 문제 시 사용) |
+| `yarn start:tunnel` | 실기기용 tunnel 모드 Metro 실행 |
+| `yarn ios` | iOS 빌드 + 시뮬레이터 실행 |
+| `yarn android` | Android 빌드 + 에뮬레이터 실행 |
+| `yarn typecheck` | TypeScript 타입 검사 |
+
+---
+
+## 권장 실행 순서
+
+### iOS 시뮬레이터 (macOS)
 
 ```bash
 yarn install
-```
-
-### 2. 개발 빌드 준비
-
-```bash
 yarn prebuild
+yarn start:clear        # 터미널 1: Metro 실행
+# 새 터미널에서:
+yarn ios                # 터미널 2: iOS 빌드 및 실행
 ```
 
-### 3. 로컬 개발 빌드 생성
+### Android 에뮬레이터 (macOS / Windows)
 
-```bash
-yarn ios
-yarn android
-```
-
-### 4. Metro 서버 실행
-
-```bash
-yarn start
-```
-
-- `yarn start`는 `EXPO_PACKAGER_PROXY_URL=http://localhost:8081`를 함께 사용해 dev client가 localhost를 우선 열도록 강제합니다.
-- 캐시/최근 세션 문제가 의심되면 `yarn start:clear`를 사용합니다.
-- 실기기 개발 시에는 `yarn start:tunnel`로 Metro를 열어 네트워크 영향을 줄입니다.
-- iOS Simulator에서는 `yarn start`를 먼저 실행한 뒤, 새 터미널에서 `yarn ios`를 실행합니다.
-- `yarn ios`는 번들러를 다시 띄우지 않고 현재 실행 중인 localhost Metro에 연결하며, dev client open URL도 localhost로 고정합니다.
-- `expo-dev-client`는 `launcher` 모드로 설정되어 최근 LAN 프로젝트를 자동 재개하지 않도록 유지합니다.
-
-### 권장 실행 순서
+**처음 설치하거나 네이티브 변경 후:**
 
 ```bash
 yarn install
 yarn prebuild
-yarn start:clear
+yarn android            # 빌드 + 설치 + Metro 자동 시작
 ```
 
-새 터미널에서:
+**앱이 이미 설치된 경우:**
 
 ```bash
-yarn ios
+yarn start:clear        # Metro만 실행 → 에뮬레이터에서 자동 연결
 ```
 
-네이티브 의존성, Expo plugin, `app.config.ts` 변경 후에는 아래 순서를 다시 수행합니다.
+### 네이티브 변경 후 (plugin / config / 의존성 변경 시)
 
 ```bash
 yarn prebuild:clean
-yarn ios
+yarn ios    # 또는 yarn android
 ```
+
+### 실기기 개발
+
+```bash
+yarn start:tunnel
+```
+
+---
 
 ## EAS 개발 빌드
 
@@ -95,6 +144,8 @@ yarn ios
 npx eas-cli build --profile development --platform ios
 npx eas-cli build --profile development --platform android
 ```
+
+---
 
 ## 다음 우선순위
 
