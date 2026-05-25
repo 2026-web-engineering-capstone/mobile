@@ -818,10 +818,6 @@ function QueueStatusPill({
   );
 }
 
-function formatLineBadgeText(line: LineMeta) {
-  return /^[1-9]$/.test(line.char) ? `${line.char}호선` : line.char;
-}
-
 function StationLineBadges({
   lines,
   size = 24,
@@ -834,7 +830,7 @@ function StationLineBadges({
       {lines.map((line, index) => (
         <LineBadge
           key={`${line.char}-${line.color}-${index}`}
-          char={formatLineBadgeText(line)}
+          char={line.char}
           color={line.color}
           size={size}
         />
