@@ -64,7 +64,9 @@ export function NativeNaverMap({
         mapRef.current?.setLocationTrackingMode('NoFollow');
       }}
       locationOverlay={{
-        isVisible: false,
+        isVisible: Boolean(currentLocation),
+        position: currentLocation ?? undefined,
+        anchor: { x: 0.5, y: 0.5 },
       }}
       layerGroups={{
         BUILDING: true,

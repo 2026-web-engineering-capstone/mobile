@@ -3,7 +3,7 @@
  *
  * 인디고 헤더 카드 + 체크리스트 + 메모 + 모두 체크 시 "승차 완료 처리하기" CTA.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -27,11 +27,13 @@ import { ApiError } from '@/lib/api/client';
 import {
   useSupportRequest,
   useUpdateSupportRequestChecklist,
+  useUpdateSupportRequestStatus,
 } from '@/features/support-request/hooks/use-support-requests';
 import {
   canStaffManageSupportRequest,
   type SupportRequestChecklistItem,
 } from '@/features/support-request/types';
+import { MEETING_POINT_LABELS } from '@/features/support-request/store/use-request-draft-store';
 import { useAuth } from '@/providers/auth-provider';
 
 export function StaffActiveScreen() {
@@ -41,13 +43,27 @@ export function StaffActiveScreen() {
   const { user } = useAuth();
   const requestQuery = useSupportRequest(requestId);
   const checklistMutation = useUpdateSupportRequestChecklist(requestId);
+  const statusMutation = useUpdateSupportRequestStatus(requestId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const autoTransitionRef = useRef(false);
+
+  const request = requestQuery.data;
+
+  useEffect(() => {
+    if (!request || autoTransitionRef.current) return;
+    if (request.status === 'assigned') {
+      autoTransitionRef.current = true;
+      statusMutation.mutate(
+        { status: 'in_progress' },
+        { onError: () => { autoTransitionRef.current = false; } },
+      );
+    }
+  }, [request, statusMutation]);
 
   if (requestQuery.isLoading) return <LoadingView />;
-  if (requestQuery.isError || !requestQuery.data) {
+  if (requestQuery.isError || !request) {
     return <ErrorView message={requestQuery.error?.message ?? '요청을 찾을 수 없습니다.'} />;
   }
-  const request = requestQuery.data;
 
   if (!canStaffManageSupportRequest(request, user)) {
     return <ErrorView message="이 요청을 진행할 권한이 없습니다." />;
@@ -80,7 +96,7 @@ export function StaffActiveScreen() {
       <GyoumAppBar
         title="지원 진행 중"
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)"))}
       />
       <ScrollView
         style={{ flex: 1 }}
@@ -210,7 +226,7 @@ export function StaffActiveScreen() {
             <Text
               style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: BRAND_TOKENS.textMid }}
             >
-              {request.meeting_point}
+              {MEETING_POINT_LABELS[request.meeting_point] ?? request.meeting_point}
             </Text>
           </View>
         </GyoumCard>

@@ -88,7 +88,7 @@ export function RequestDetailScreen() {
       <GyoumAppBar
         title="요청 상세"
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)"))}
       />
       <ScrollView
         style={{ flex: 1 }}
@@ -110,16 +110,6 @@ export function RequestDetailScreen() {
             }}
           >
             <View>
-              <Text
-                style={{
-                  fontFamily: FONT_FAMILY,
-                  fontSize: 11,
-                  color: BRAND_TOKENS.textMuted,
-                  marginBottom: 4,
-                }}
-              >
-                #{request.id.slice(-6).toUpperCase()}
-              </Text>
               <Text
                 style={{
                   fontFamily: FONT_FAMILY,

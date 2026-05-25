@@ -4,7 +4,6 @@
  * 인사말 → 가까운 역 카드(네이버 지도 + 노선 뱃지) → 진행 중 요청 카드 → 코랄 CTA →
  * 즐겨찾기 경로 → 역 시설 안내 + 실시간 도착 정보.
  */
-import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,15 +20,11 @@ import {
   StarIcon,
   StatusChip,
 } from '@/components/ui';
-import { BRAND_TOKENS, RADIUS, getLineMeta, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
 import { typo } from '@/lib/typography';
 import { MapSection } from '@/features/home/components/map-section';
-import {
-  DEFAULT_STATION,
-  STATION_CATALOG,
-} from '@/features/home/data/station-catalog';
+import { DEFAULT_STATION } from '@/features/home/data/station-catalog';
 import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
-import { findNearestStation } from '@/features/home/lib/find-nearest-station';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
 import { LiveArrivalSection } from '@/features/transit/components/live-arrival-section';
@@ -44,13 +39,10 @@ export function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { data: requests = [] } = useSupportRequests(user?.role === 'passenger');
-  const { currentLocation } = useCurrentLocation();
+  useCurrentLocation(false);
   const favoriteStations = useStationPreferencesStore((s) => s.favoriteStations);
 
-  const station = useMemo(() => {
-    if (!currentLocation) return DEFAULT_STATION;
-    return findNearestStation(currentLocation, STATION_CATALOG) ?? DEFAULT_STATION;
-  }, [currentLocation]);
+  const station = DEFAULT_STATION;
 
   const activeRequest = requests.find(
     (request) =>
@@ -58,7 +50,6 @@ export function HomeScreen() {
       !TERMINAL_REQUEST_STATUSES.includes(request.status),
   );
 
-  const lineMeta = getLineMeta(station.line.label);
   const userName = user?.name ?? '승객';
 
   return (
@@ -161,7 +152,7 @@ export function HomeScreen() {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <LineBadge char={lineMeta.char} color="white" size={36} />
+              <LineBadge char={station.line.label} color={station.line.colors.primary} size={36} />
               <View style={{ flex: 1 }}>
                 <Text
                   style={[
@@ -170,14 +161,6 @@ export function HomeScreen() {
                   ]}
                 >
                   {station.name}
-                </Text>
-                <Text
-                  style={[
-                    typo('body-sm'),
-                    { color: BRAND_TOKENS.textOnDark, opacity: 0.75 },
-                  ]}
-                >
-                  {station.line.label}
                 </Text>
               </View>
             </View>

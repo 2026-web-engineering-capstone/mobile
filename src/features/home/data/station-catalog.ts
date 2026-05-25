@@ -99,5 +99,5 @@ export const STATION_CATALOG: readonly StationInfo[] = [
 ];
 
 export const DEFAULT_STATION: StationInfo =
-  STATION_CATALOG.find((station) => station.name === '인천대입구역') ??
+  STATION_CATALOG.find((station) => station.name === '한성대입구역') ??
   STATION_CATALOG[0];

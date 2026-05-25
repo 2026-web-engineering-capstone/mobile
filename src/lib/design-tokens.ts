@@ -146,8 +146,8 @@ export const SPACING = {
 export type LineMeta = { readonly color: string; readonly char: string };
 
 const FALLBACK_LINE_META: LineMeta = {
-  color: BRAND_TOKENS.line1Incheon,
-  char: '인',
+  color: BRAND_TOKENS.line4,
+  char: '4',
 };
 
 export function getLineMeta(line: string | null | undefined): LineMeta {
@@ -157,7 +157,7 @@ export function getLineMeta(line: string | null | undefined): LineMeta {
   if (line.startsWith('1호선')) return { color: BRAND_TOKENS.line1, char: '1' };
   if (line.startsWith('2호선')) return { color: BRAND_TOKENS.line2, char: '2' };
   if (line.startsWith('3호선')) return { color: BRAND_TOKENS.line3, char: '3' };
-  if (line.startsWith('서울4호선') || line.startsWith('4호선')) {
+  if (line.includes('4호선')) {
     return { color: BRAND_TOKENS.line4, char: '4' };
   }
   if (line.startsWith('9호선')) return { color: BRAND_TOKENS.line9, char: '9' };

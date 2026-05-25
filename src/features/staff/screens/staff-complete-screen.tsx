@@ -99,7 +99,7 @@ export function StaffCompleteScreen() {
       <GyoumAppBar
         title="지원 완료 처리"
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)"))}
       />
       <ScrollView
         style={{ flex: 1 }}

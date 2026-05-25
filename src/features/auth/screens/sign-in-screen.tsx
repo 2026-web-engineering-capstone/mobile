@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,17 +13,13 @@ import {
   Screen,
   SectionLabel,
   StationChipDS,
-  ToggleChip,
   WheelchairIcon,
   CompanionIcon,
-  TrainIcon,
-  BellIcon,
 } from '@/components/ui';
 import { BRAND_TOKENS, FONT_FAMILY, RADIUS } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/api/client';
 import type { Role } from '@/lib/api/types';
 import { useAuth } from '@/providers/auth-provider';
-import { useAppStore } from '@/store/app-store';
 import { useStations } from '@/features/support-request/hooks/use-support-requests';
 
 type RoleOption = {
@@ -45,18 +41,6 @@ const ROLE_OPTIONS: RoleOption[] = [
     label: '역무원',
     tagline: '들어온 지원 요청을 현장에서 처리합니다',
     icon: (color) => <CompanionIcon color={color} size={22} />,
-  },
-  {
-    role: 'driver',
-    label: '기관사',
-    tagline: '교통약자 승차 알림을 받습니다',
-    icon: (color) => <TrainIcon color={color} size={22} />,
-  },
-  {
-    role: 'admin',
-    label: '관리자',
-    tagline: '로그와 처리 시간을 모니터링합니다',
-    icon: (color) => <BellIcon color={color} size={22} />,
   },
 ];
 
@@ -82,11 +66,6 @@ export function SignInScreen() {
   const [stationQuery, setStationQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const fontScale = useAppStore((state) => state.fontScale);
-  const toggleFontScale = useAppStore((state) => state.toggleFontScale);
-  const highContrast = useAppStore((state) => state.highContrast);
-  const toggleHighContrast = useAppStore((state) => state.toggleHighContrast);
 
   // 직전 근무 역 자동 복원.
   useEffect(() => {
@@ -248,30 +227,8 @@ export function SignInScreen() {
           paddingHorizontal: 24,
         }}
       >
-        {/* 접근성 토글 */}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-          <GyoumCTA
-            variant={fontScale === 'lg' ? 'soft' : 'ghost'}
-            size="sm"
-            fullWidth={false}
-            onPress={toggleFontScale}
-            accessibilityLabel="큰 글씨 모드"
-          >
-            가 {fontScale === 'lg' ? '큼' : '보통'}
-          </GyoumCTA>
-          <GyoumCTA
-            variant={highContrast ? 'soft' : 'ghost'}
-            size="sm"
-            fullWidth={false}
-            onPress={toggleHighContrast}
-            accessibilityLabel="고대비 모드"
-          >
-            고대비 {highContrast ? 'ON' : 'OFF'}
-          </GyoumCTA>
-        </View>
-
         {/* 브랜드 */}
-        <View style={{ marginTop: 32, alignItems: 'center', gap: 16 }}>
+        <View style={{ marginTop: 16, alignItems: 'center', gap: 16 }}>
           <View
             style={{
               width: 80,
@@ -325,14 +282,69 @@ export function SignInScreen() {
           {ROLE_OPTIONS.map((option) => {
             const selected = option.role === selectedRole;
             return (
-              <ToggleChip
+              <Pressable
                 key={option.role}
-                icon={option.icon(selected ? BRAND_TOKENS.textOnDark : BRAND_TOKENS.text)}
-                label={option.label}
-                sub={option.tagline}
-                selected={selected}
                 onPress={() => handleSelectRole(option.role)}
-              />
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 14,
+                  paddingHorizontal: 16,
+                  paddingVertical: 16,
+                  borderRadius: RADIUS.chip,
+                  backgroundColor: selected ? BRAND_TOKENS.brandLight : BRAND_TOKENS.surface,
+                  borderWidth: 2,
+                  borderColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.border,
+                }}
+              >
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    borderWidth: 2,
+                    borderColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.borderStrong,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {selected ? (
+                    <View
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: BRAND_TOKENS.brand,
+                      }}
+                    />
+                  ) : null}
+                </View>
+                {option.icon(selected ? BRAND_TOKENS.brand : BRAND_TOKENS.text)}
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontFamily: FONT_FAMILY,
+                      fontSize: 15,
+                      fontWeight: '600',
+                      color: BRAND_TOKENS.text,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: FONT_FAMILY,
+                      fontSize: 12,
+                      color: BRAND_TOKENS.textMuted,
+                      marginTop: 2,
+                    }}
+                  >
+                    {option.tagline}
+                  </Text>
+                </View>
+              </Pressable>
             );
           })}
         </View>

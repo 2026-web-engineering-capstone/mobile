@@ -1,4 +1,4 @@
-export type Role = 'passenger' | 'staff' | 'driver' | 'admin';
+export type Role = 'passenger' | 'staff';
 
 export type ApiEnvelope<T> = {
   success: boolean;
@@ -12,6 +12,7 @@ export type SessionUser = {
   email: string;
   role: Role;
   station_id: string | null;
+  station_name: string | null;
 };
 
 export type SessionResponse = {
