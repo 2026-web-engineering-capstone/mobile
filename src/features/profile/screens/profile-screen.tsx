@@ -1,9 +1,10 @@
 import { Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, getStationLineMetas, pretendard } from '@/lib/design-tokens';
 import {
   GyoumCard,
   GyoumCTA,
+  LineBadge,
 } from '@/components/ui/gyoum-primitives';
 import { Screen } from '@/components/ui/screen';
 import { useStations } from '@/features/support-request/hooks/use-support-requests';
@@ -20,7 +21,13 @@ export function ProfileScreen() {
   const displayName = user?.name ?? '교움 사용자';
   const displayEmail = user?.email ?? 'demo@gyoum.kr';
   const avatarInitial = displayName.slice(0, 1);
-  const stationName = stationsQuery.data?.find((station) => station.id === user?.station_id)?.name;
+  const station = stationsQuery.data?.find((item) => item.id === user?.station_id);
+  const stationName = station?.name;
+  const stationLineMeta = station
+    ? getStationLineMetas(station.line, station.id)[0]
+    : user?.station_id
+      ? getStationLineMetas(stationName, user.station_id)[0]
+      : null;
 
   return (
     <Screen scrollable padded>
@@ -50,27 +57,31 @@ export function ProfileScreen() {
               paddingVertical: 6,
             }}
           >
-            <View
-              style={{
-                width: 72,
-                height: 72,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 36,
-                backgroundColor: BRAND_TOKENS.brand,
-              }}
-            >
-              <Text
+            {stationLineMeta ? (
+              <LineBadge char={stationLineMeta.char} color={stationLineMeta.color} size={72} />
+            ) : (
+              <View
                 style={{
-                  fontFamily: pretendard('700'),
-                  fontWeight: '700',
-                  fontSize: 28,
-                  color: BRAND_TOKENS.onBrand100,
+                  width: 72,
+                  height: 72,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 36,
+                  backgroundColor: BRAND_TOKENS.brand,
                 }}
               >
-                {avatarInitial}
-              </Text>
-            </View>
+                <Text
+                  style={{
+                    fontFamily: pretendard('700'),
+                    fontWeight: '700',
+                    fontSize: 28,
+                    color: BRAND_TOKENS.onBrand100,
+                  }}
+                >
+                  {avatarInitial}
+                </Text>
+              </View>
+            )}
             <View style={{ alignItems: 'center', gap: 6 }}>
               <Text
                 style={{

@@ -5,7 +5,7 @@
  * 백엔드는 BOARDED → AWAITING_DROPOFF → COMPLETED 전이 규칙이라, 이 화면에서는
  * 먼저 AWAITING_DROPOFF로 보낸 뒤 COMPLETED로 전이한다.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -50,6 +50,13 @@ export function StaffCompleteScreen() {
   const statusMutation = useUpdateSupportRequestStatus(requestId);
   const [memo, setMemo] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [isCompleting, setIsCompleting] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (requestQuery.isLoading) return <LoadingView />;
   if (requestQuery.isError || !requestQuery.data) {
@@ -57,7 +64,7 @@ export function StaffCompleteScreen() {
   }
   const request = requestQuery.data;
 
-  if (!canStaffManageSupportRequest(request, user)) {
+  if (!isCompleting && !canStaffManageSupportRequest(request, user)) {
     return <ErrorView message="이 요청을 처리할 권한이 없습니다." />;
   }
 
@@ -68,13 +75,14 @@ export function StaffCompleteScreen() {
       submittedToAssigned: formatDuration(request.created_at, findEventAt('assigned')),
       assignedToInProgress: formatDuration(findEventAt('assigned'), findEventAt('in_progress')),
       inProgressToBoarded: formatDuration(findEventAt('in_progress'), findEventAt('boarded')),
-      boardedToDropoff: formatDuration(findEventAt('boarded'), new Date().toISOString()),
-      total: formatDuration(request.created_at, new Date().toISOString()),
+      boardedToDropoff: formatDuration(findEventAt('boarded'), new Date(nowMs).toISOString()),
+      total: formatDuration(request.created_at, new Date(nowMs).toISOString()),
     };
-  }, [request]);
+  }, [nowMs, request]);
 
   const handleComplete = async () => {
     setErrorMessage(null);
+    setIsCompleting(true);
     const note = memo.trim() || '하차 지원 완료';
     try {
       // BOARDED 상태라면 먼저 AWAITING_DROPOFF로 전이.
@@ -89,6 +97,7 @@ export function StaffCompleteScreen() {
     } catch (error) {
       if (error instanceof ApiError) setErrorMessage(error.message);
       else setErrorMessage('하차 완료 처리에 실패했습니다.');
+      setIsCompleting(false);
     }
   };
 
@@ -239,7 +248,7 @@ export function StaffCompleteScreen() {
           disabled={statusMutation.isPending}
           leadingIcon={<CheckIcon color={BRAND_TOKENS.onBrand100} size={20} />}
         >
-          {statusMutation.isPending ? '처리 중...' : '하차 완료 처리'}
+          {isCompleting || statusMutation.isPending ? '처리 중...' : '하차 완료 처리'}
         </GyoumCTA>
       </BottomBar>
     </Screen>
@@ -250,23 +259,35 @@ function InfoPill({ label, value }: { label: string; value: string }) {
   return (
     <View
       style={{
-        paddingHorizontal: 10,
-        paddingVertical: 7,
+        minWidth: 56,
+        minHeight: 56,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
         borderRadius: RADIUS.pill,
         backgroundColor: BRAND_TOKENS.surface,
         borderWidth: 1,
         borderColor: BRAND_TOKENS.border,
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
-      <Text style={{ fontFamily: FONT_FAMILY, fontSize: 11, color: BRAND_TOKENS.textMuted }}>
+      <Text
+        style={{
+          fontFamily: FONT_FAMILY,
+          fontSize: 11,
+          color: BRAND_TOKENS.textMuted,
+          textAlign: 'center',
+        }}
+      >
         {label}
       </Text>
       <Text
         style={{
           fontFamily: FONT_FAMILY,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: '700',
           color: BRAND_TOKENS.text,
+          textAlign: 'center',
         }}
       >
         {value}

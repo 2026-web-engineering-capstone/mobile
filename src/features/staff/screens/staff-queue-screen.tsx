@@ -63,8 +63,11 @@ function getStaffStationDisplayName(
   stationName?: string,
 ) {
   if (!user?.station_id) return '근무지 미지정';
-  if (stationName) return stationName.replace(/역$/, '');
-  if (user.name.endsWith(' 역무원')) return user.name.replace(/ 역무원$/, '');
+  if (stationName) return stationName.endsWith('역') ? stationName : `${stationName}역`;
+  if (user.name.endsWith(' 역무원')) {
+    const name = user.name.replace(/ 역무원$/, '');
+    return name.endsWith('역') ? name : `${name}역`;
+  }
   return user.station_id;
 }
 
@@ -331,7 +334,7 @@ export function StaffQueueScreen() {
                   color: BRAND_TOKENS.onBrand60,
                 }}
               >
-                {user?.name}
+                역무원 모드
               </Text>
             </View>
             <View
@@ -353,15 +356,6 @@ export function StaffQueueScreen() {
                   }}
                 >
                   {stationDisplayName}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: FONT_FAMILY,
-                    fontSize: 12,
-                    color: BRAND_TOKENS.onBrand60,
-                  }}
-                >
-                  역무원 모드
                 </Text>
               </View>
             </View>

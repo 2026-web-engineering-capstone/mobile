@@ -365,7 +365,7 @@ export function StaffBoardingScreen() {
                   fontWeight: '500',
                 }}
               >
-                하차 역 역무원과 기관사에게 안전 알림이 자동 발송됩니다.
+                하차 역 역무원에게 열차 정보가 전달됩니다.
               </Text>
             </View>
           </GyoumCard>

@@ -157,7 +157,6 @@ export function SignInScreen() {
               <StationChipDS
                 key={station.id}
                 station={station}
-                size="sm"
                 selected={selectedStationId === station.id}
                 onPress={() => setSelectedStationId(station.id)}
               />
