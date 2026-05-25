@@ -66,6 +66,7 @@ export function NativeNaverMap({
       locationOverlay={{
         isVisible: Boolean(currentLocation),
         position: currentLocation ?? undefined,
+        anchor: { x: 0.5, y: 0.5 },
       }}
       layerGroups={{
         BUILDING: true,
