@@ -15,20 +15,10 @@ import { useSupportRequests } from '@/features/support-request/hooks/use-support
 import { TERMINAL_REQUEST_STATUSES } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
+import { formatKoreanDateTime } from '@/lib/date/format';
+
 function formatDateTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatKoreanDateTime(value);
 }
 
 export function HistoryScreen() {
@@ -39,6 +29,9 @@ export function HistoryScreen() {
     isPassenger,
     false,
   );
+  const activeItems = data
+    .filter((item) => !TERMINAL_REQUEST_STATUSES.includes(item.status))
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   const historyItems = data
     .filter((item) => TERMINAL_REQUEST_STATUSES.includes(item.status))
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
@@ -83,10 +76,10 @@ export function HistoryScreen() {
               color: BRAND_TOKENS.text,
             }}
           >
-            완료된 이용 내역
+            이용 내역
           </Text>
           <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
-            종료된 요청 {historyItems.length}건
+            진행 중 {activeItems.length}건 · 종료 {historyItems.length}건
           </Text>
         </View>
 
@@ -110,6 +103,51 @@ export function HistoryScreen() {
               fg={BRAND_TOKENS.warning}
               bg={BRAND_TOKENS.warningBg}
             />
+          </View>
+        ) : null}
+
+        {!isLoading && activeItems.length > 0 ? (
+          <View style={{ gap: 8 }}>
+            <Text
+              style={{
+                fontFamily: pretendard('600'),
+                fontWeight: '600',
+                fontSize: 14,
+                color: BRAND_TOKENS.brand,
+              }}
+            >
+              진행 중
+            </Text>
+            {activeItems.map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => router.push(`/(app)/support/status/${item.id}`)}
+                accessibilityRole="button"
+              >
+                <GyoumCard padding={16} style={{ borderColor: BRAND_TOKENS.brand, borderWidth: 1.5 }}>
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text
+                        style={{
+                          fontFamily: pretendard('600'),
+                          fontWeight: '600',
+                          fontSize: 16,
+                          color: BRAND_TOKENS.text,
+                        }}
+                      >
+                        {item.origin_station_name}{' '}
+                        <Text style={{ color: BRAND_TOKENS.borderStrong }}>→</Text>{' '}
+                        {item.destination_station_name}
+                      </Text>
+                      <StatusChip status={item.status} size="sm" />
+                    </View>
+                    <Text style={{ fontSize: 12, color: BRAND_TOKENS.textMuted }}>
+                      {item.support_types.map((type) => SUPPORT_TYPE_LABELS[type]).join(', ')}
+                    </Text>
+                  </View>
+                </GyoumCard>
+              </Pressable>
+            ))}
           </View>
         ) : null}
 
@@ -191,11 +229,6 @@ export function HistoryScreen() {
                       {item.support_types
                         .map((type) => SUPPORT_TYPE_LABELS[type])
                         .join(', ')}
-                    </Text>
-                    <Text
-                      style={{ fontSize: 12, color: BRAND_TOKENS.borderStrong }}
-                    >
-                      {item.id}
                     </Text>
                   </View>
                 </View>

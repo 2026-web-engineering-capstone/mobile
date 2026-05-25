@@ -45,10 +45,6 @@ import type { Station } from '@/lib/api/types';
 
 type Step = 'stationPick' | 'supportTypes' | 'meeting' | 'review';
 
-const STATION_ID_BY_NAME = Object.fromEntries(
-  INCHEON_LINE_STATIONS.map((station) => [station.name, station.id]),
-);
-
 export function RequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -59,7 +55,7 @@ export function RequestScreen() {
 
   const handleBackOrPrevStep = () => {
     if (step === 'stationPick') {
-      router.back();
+      router.canGoBack() ? router.back() : router.replace('/(app)/(tabs)');
       return;
     }
     if (step === 'supportTypes') setStep('stationPick');
@@ -183,22 +179,21 @@ function StationPickStep({
     !!destinationStationId &&
     originStationId !== destinationStationId;
 
+  const stationLabel = (s: Station): string | undefined => {
+    if (s.id === originStationId) return '출발';
+    if (s.id === destinationStationId) return '도착';
+    return undefined;
+  };
+
   return (
     <>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 140,
-        }}
-        keyboardShouldPersistTaps="handled"
-      >
+      {/* Sticky 출발/도착 슬롯 */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 }}>
         <PageTitle sub="출발할 역과 도착할 역을 선택해주세요.">
           어디로 이동하시나요?
         </PageTitle>
 
-        <View style={{ position: 'relative', marginBottom: 20 }}>
+        <View style={{ position: 'relative', marginBottom: 12 }}>
           <SlotRow
             label="출발"
             station={depart}
@@ -245,8 +240,17 @@ function StationPickStep({
           placeholder="역 이름 검색"
           onClear={() => setQuery('')}
         />
+      </View>
 
-        <View style={{ height: 16 }} />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 140,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
         <SectionLabel>
           {query ? `검색 결과 (${stations.length})` : '전체 역'}
         </SectionLabel>
@@ -268,6 +272,7 @@ function StationPickStep({
               key={s.id}
               station={s}
               size="sm"
+              label={stationLabel(s)}
               selected={(focus === 'depart' ? depart : arrive)?.id === s.id}
               onPress={() => setStation(s)}
             />

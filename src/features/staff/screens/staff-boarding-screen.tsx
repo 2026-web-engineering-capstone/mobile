@@ -78,7 +78,7 @@ export function StaffBoardingScreen() {
       <GyoumAppBar
         title="승차 완료"
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)"))}
       />
       <ScrollView
         style={{ flex: 1 }}

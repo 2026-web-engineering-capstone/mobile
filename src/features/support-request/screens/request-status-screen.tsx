@@ -51,12 +51,11 @@ import {
   type SupportRequestStatus,
 } from '@/features/support-request/types';
 import { MEETING_POINT_LABELS, SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
+import { formatKoreanTime } from '@/lib/date/format';
 
 function formatTime(iso: string | null | undefined) {
   if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return formatKoreanTime(iso);
 }
 
 const PROGRESS_DESCRIPTIONS: Record<SupportRequestStatus, string> = {
@@ -95,7 +94,7 @@ export function RequestStatusScreen() {
         <GyoumAppBar
           title="요청 상세"
           topInset={insets.top}
-          onBack={() => router.back()}
+          onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)"))}
         />
         <PassengerLikeBody insets={insets} request={request} hideCancel />
       </Screen>
@@ -112,7 +111,7 @@ export function RequestStatusScreen() {
       <GyoumAppBar
         title="진행 상황"
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)/(tabs)"))}
         trailing={<StatusChip status={request.status} size="sm" />}
       />
       <PassengerLikeBody insets={insets} request={request} />
@@ -255,20 +254,11 @@ function SummaryCard({ request }: { request: SupportRequestDetail }) {
       <View
         style={{
           flexDirection: 'row',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           alignItems: 'center',
           marginBottom: 14,
         }}
       >
-        <Text
-          style={{
-            fontFamily: FONT_FAMILY,
-            fontSize: 12,
-            color: BRAND_TOKENS.onBrand60,
-          }}
-        >
-          요청 번호 #{request.id.slice(-6).toUpperCase()}
-        </Text>
         <Text
           style={{
             fontFamily: FONT_FAMILY,

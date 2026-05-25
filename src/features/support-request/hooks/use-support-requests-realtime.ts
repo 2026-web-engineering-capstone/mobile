@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getWebSocketBaseUrl } from '@/lib/api/client';
+import { getSupportRequestsWebSocketUrl } from '@/lib/api/client';
 
 export function useSupportRequestsRealtime(enabled = true) {
   const queryClient = useQueryClient();
@@ -10,13 +10,10 @@ export function useSupportRequestsRealtime(enabled = true) {
       return;
     }
 
-    const websocket = new WebSocket(
-      `${getWebSocketBaseUrl()}/support-requests/ws`,
-    );
+    const websocket = new WebSocket(getSupportRequestsWebSocketUrl());
 
     websocket.onmessage = () => {
       void queryClient.invalidateQueries({ queryKey: ['support-requests'] });
-      void queryClient.invalidateQueries({ queryKey: ['staff-support'] });
     };
 
     return () => {

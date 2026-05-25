@@ -36,10 +36,10 @@ import { useAuth } from '@/providers/auth-provider';
 
 type Tab = 'incoming' | 'done';
 
+import { elapsedMinutesSafe } from '@/lib/date/format';
+
 function elapsedMinutes(createdAt: string): number {
-  const created = new Date(createdAt).getTime();
-  if (Number.isNaN(created)) return 0;
-  return Math.max(0, Math.floor((Date.now() - created) / 60000));
+  return elapsedMinutesSafe(createdAt);
 }
 
 export function StaffQueueScreen() {
@@ -202,7 +202,7 @@ export function StaffQueueScreen() {
                     color: BRAND_TOKENS.onBrand100,
                   }}
                 >
-                  {user?.station_id ? `${user.station_id} 역` : '근무지 미지정'}
+                  {user?.station_name ?? '근무지 미지정'}
                 </Text>
                 <Text
                   style={{
@@ -438,16 +438,6 @@ function RequestQueueCard({
         }}
       >
         <View>
-          <Text
-            style={{
-              fontFamily: FONT_FAMILY,
-              fontSize: 11,
-              color: BRAND_TOKENS.textMuted,
-              marginBottom: 2,
-            }}
-          >
-            #{request.id.slice(-6).toUpperCase()}
-          </Text>
           <Text
             style={{
               fontFamily: FONT_FAMILY,
