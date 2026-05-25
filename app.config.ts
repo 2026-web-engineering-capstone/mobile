@@ -1,3 +1,8 @@
+import {
+  AndroidConfig,
+  type ConfigPlugin,
+  withAndroidManifest,
+} from '@expo/config-plugins';
 import type { ExpoConfig } from 'expo/config';
 import { existsSync } from 'node:fs';
 import { resolve as pathResolve } from 'node:path';
@@ -79,6 +84,7 @@ const config: ExpoConfig = {
         client_id: naverMapClientId,
       },
     ],
+    withResolvedNaverMapAndroidClientId as never,
     [
       'expo-build-properties',
       {

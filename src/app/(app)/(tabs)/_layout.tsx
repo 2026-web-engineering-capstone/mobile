@@ -68,7 +68,15 @@ function TabsLayout() {
           title: '지원 요청',
           tabBarIcon: ({ color, focused, size }) => (
             <Ionicons
-              name={focused ? 'train' : 'train-outline'}
+              name={
+                isStaff
+                  ? focused
+                    ? 'list'
+                    : 'list-outline'
+                  : focused
+                    ? 'train'
+                    : 'train-outline'
+              }
               size={focused ? size + 1 : size}
               color={color}
             />

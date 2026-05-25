@@ -45,6 +45,10 @@ import type { Station } from '@/lib/api/types';
 
 type Step = 'stationPick' | 'supportTypes' | 'meeting' | 'review';
 
+const STATION_ID_BY_NAME = Object.fromEntries(
+  INCHEON_LINE_STATIONS.map((station) => [station.name, station.id]),
+);
+
 export function RequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();

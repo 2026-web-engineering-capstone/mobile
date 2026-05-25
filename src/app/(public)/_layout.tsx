@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useAuth } from '@/providers/auth-provider';
 
 export default function PublicLayout() {
@@ -8,8 +8,8 @@ export default function PublicLayout() {
     return null;
   }
 
-  if (isAuthenticated) {
-    return <Redirect href="/(app)/(tabs)" />;
+  if (isHydrating) {
+    return null;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;

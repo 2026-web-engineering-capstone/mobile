@@ -6,7 +6,6 @@ import {
 import type { StationInfo } from '@/features/home/types';
 
 type MapSectionProps = {
-  routePath?: Coordinate[];
   station: StationInfo;
 };
 
@@ -68,11 +67,7 @@ function NativeMapSection({ routePath, station }: MapSectionProps) {
 
   return (
     <View className="h-60 overflow-hidden rounded-2xl bg-default-100">
-      <NativeNaverMap
-        currentLocation={currentLocation}
-        routePath={routePath}
-        station={station}
-      />
+      <LiveNaverMap currentLocation={currentLocation} station={station} />
       {isLoading ? (
         <View className="absolute left-3 top-3 rounded-full bg-background/90 px-3 py-1.5">
           <Text className="text-xs text-default-600">현재 위치 확인 중</Text>
