@@ -125,7 +125,11 @@ export function StaffActiveScreen() {
   const handleBackToQueue = () => {
     cacheSupportRequestInList(queryClient, request);
     void queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
-    router.replace('/(app)/(tabs)');
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)/(tabs)');
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-export type Role = 'passenger' | 'staff' | 'driver' | 'admin';
+export type Role = 'passenger' | 'staff';
 
 export type ApiEnvelope<T> = {
   success: boolean;

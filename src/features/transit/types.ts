@@ -9,6 +9,7 @@ export type ArrivalTrain = {
   currentStation: string | null;
   line: string | null;
   lineId: string | null;
+  etaSeconds: number | null;
 };
 
 export type StationArrivals = {

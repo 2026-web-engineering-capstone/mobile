@@ -23,6 +23,7 @@ import {
   SectionLabel,
 } from '@/components/ui';
 import { BRAND_TOKENS, FONT_FAMILY, RADIUS } from '@/lib/design-tokens';
+import { parseApiDate } from '@/lib/datetime';
 import { ApiError } from '@/lib/api/client';
 import {
   useSupportRequest,
@@ -33,8 +34,8 @@ import { useAuth } from '@/providers/auth-provider';
 
 function formatDuration(startIso: string | null, endIso: string | null) {
   if (!startIso || !endIso) return '-';
-  const start = new Date(startIso).getTime();
-  const end = new Date(endIso).getTime();
+  const start = parseApiDate(startIso).getTime();
+  const end = parseApiDate(endIso).getTime();
   if (Number.isNaN(start) || Number.isNaN(end) || end < start) return '-';
   const mins = Math.round((end - start) / 60000);
   return `${mins}분`;
@@ -97,7 +98,13 @@ export function StaffCompleteScreen() {
       <GyoumAppBar
         title="하차 완료 처리"
         topInset={insets.top}
-        onBack={() => router.back()}
+        onBack={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(app)/(tabs)');
+          }
+        }}
       />
       <ScrollView
         style={{ flex: 1 }}

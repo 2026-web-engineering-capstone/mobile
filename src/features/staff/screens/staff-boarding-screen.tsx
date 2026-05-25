@@ -24,6 +24,7 @@ import { BRAND_TOKENS, FONT_FAMILY, RADIUS } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/api/client';
 import {
   cacheSupportRequestInList,
+  useAssignSupportRequest,
   useSupportRequest,
   useUpdateSupportRequestStatus,
 } from '@/features/support-request/hooks/use-support-requests';
@@ -59,6 +60,7 @@ export function StaffBoardingScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const requestQuery = useSupportRequest(requestId);
+  const assignMutation = useAssignSupportRequest();
   const statusMutation = useUpdateSupportRequestStatus(requestId);
   const request = requestQuery.data;
   const arrivalsQuery = useStationArrivals(request?.origin_station_name ?? null);
@@ -118,7 +120,10 @@ export function StaffBoardingScreen() {
         return;
       }
 
-      if (loadedRequest.status === 'assigned') {
+      if (loadedRequest.status === 'submitted') {
+        await assignMutation.mutateAsync(loadedRequest.id);
+      }
+      if (loadedRequest.status === 'submitted' || loadedRequest.status === 'assigned') {
         await statusMutation.mutateAsync({ status: 'in_progress' });
       }
       await statusMutation.mutateAsync({
@@ -137,7 +142,11 @@ export function StaffBoardingScreen() {
   const handleBackToQueue = () => {
     cacheSupportRequestInList(queryClient, loadedRequest);
     void queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
-    router.replace('/(app)/(tabs)');
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)/(tabs)');
+    }
   };
 
   return (

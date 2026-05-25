@@ -33,7 +33,7 @@ type SessionUser = {
   id: string;
   name: string;
   email: string;
-  role: 'passenger' | 'staff' | 'driver' | 'admin';
+  role: 'passenger' | 'staff';
   station_id: string | null;
 };
 

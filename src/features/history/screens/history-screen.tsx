@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui';
 import { SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
+import { formatKoreanDateTime, parseApiDate } from '@/lib/datetime';
 import {
   SUPPORT_REQUEST_STATUS_LABELS,
   TERMINAL_REQUEST_STATUSES,
@@ -21,22 +23,6 @@ import { useAuth } from '@/providers/auth-provider';
 
 type HistoryFilter = 'active' | 'completed' | 'cancelled';
 
-function formatDateTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export function HistoryScreen() {
   const router = useRouter();
   const { role } = useAuth();
@@ -44,14 +30,21 @@ export function HistoryScreen() {
   const isPassenger = role === 'passenger';
   const { data = [], isLoading, error, refetch } = useSupportRequests(
     isPassenger,
-    false,
+    isPassenger ? 10_000 : false,
+  );
+  useFocusEffect(
+    useCallback(() => {
+      if (isPassenger) {
+        void refetch();
+      }
+    }, [isPassenger, refetch]),
   );
   const activeItems = data
     .filter((item) => !TERMINAL_REQUEST_STATUSES.includes(item.status))
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    .sort((a, b) => parseApiDate(b.created_at).getTime() - parseApiDate(a.created_at).getTime());
   const historyItems = data
     .filter((item) => TERMINAL_REQUEST_STATUSES.includes(item.status))
-    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    .sort((a, b) => parseApiDate(b.created_at).getTime() - parseApiDate(a.created_at).getTime());
   const completedItems = historyItems.filter(
     (item) => item.status === 'completed' || item.status === 'unavailable',
   );
@@ -201,7 +194,7 @@ export function HistoryScreen() {
                   subtitle={
                     selectedFilter === 'active'
                       ? SUPPORT_REQUEST_STATUS_LABELS[item.status]
-                      : formatDateTime(item.created_at)
+                      : formatKoreanDateTime(item.created_at)
                   }
                 />
               ))

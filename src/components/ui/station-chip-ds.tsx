@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, getStationLineMetas, getOfficialLineName, pretendard } from '@/lib/design-tokens';
 import { LineBadge } from './gyoum-primitives';
 import { CheckIcon } from './icons';
 import type { Station } from '@/lib/api/types';
@@ -26,7 +26,7 @@ export function StationChipDS({
   label,
   size = 'md',
 }: StationChipDSProps) {
-  const lineMeta = getLineMeta(station.line);
+  const lineMeta = getStationLineMetas(station.line, station.id)[0];
   const lineName = getOfficialLineName(station.line);
   const padding = size === 'sm' ? 12 : 16;
   const fontSize = size === 'sm' ? 14 : 16;

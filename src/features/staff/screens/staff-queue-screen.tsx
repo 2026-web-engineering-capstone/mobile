@@ -33,7 +33,7 @@ import {
   MEETING_POINT_LABELS,
   SUPPORT_TYPE_LABELS,
 } from '@/features/support-request/store/use-request-draft-store';
-import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
+import { useStations, useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import {
   TERMINAL_REQUEST_STATUSES,
   getStaffQueueItemClassification,
@@ -41,49 +41,13 @@ import {
 } from '@/features/support-request/types';
 import type { SessionUser } from '@/lib/api/types';
 import { useAuth } from '@/providers/auth-provider';
+import { formatRelativeFromApiDate, parseApiDate } from '@/lib/datetime';
 
 type Tab = 'incoming' | 'done';
 const STAFF_QUEUE_SEEN_STORAGE_KEY = 'gyoum.staffQueue.seenRequestKeys.v1';
 
-function elapsedMinutes(createdAt: string, nowMs = Date.now()): number {
-  const created = parseApiDate(createdAt).getTime();
-  if (Number.isNaN(created)) return 0;
-  return Math.max(0, Math.floor((nowMs - created) / 60000));
-}
-
-function parseApiDate(iso: string) {
-  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
-}
-
 function formatRelativeCreatedAt(createdAt: string, nowMs = Date.now()): string {
-  const minutes = elapsedMinutes(createdAt, nowMs);
-  if (minutes <= 0) return '방금전';
-  if (minutes < 60) return `${minutes}분전`;
-
-  const created = parseApiDate(createdAt);
-  if (Number.isNaN(created.getTime())) return '방금전';
-
-  const dateParts = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const sameDay = dateParts.format(created) === dateParts.format(new Date(nowMs));
-  const time = created.toLocaleTimeString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  if (sameDay) return `오늘 ${time}`;
-
-  return `${created.toLocaleDateString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-  })} ${time}`;
+  return formatRelativeFromApiDate(createdAt, nowMs);
 }
 
 function sortQueueRequests(
@@ -94,8 +58,12 @@ function sortQueueRequests(
   });
 }
 
-function getStaffStationDisplayName(user: ReturnType<typeof useAuth>['user']) {
+function getStaffStationDisplayName(
+  user: ReturnType<typeof useAuth>['user'],
+  stationName?: string,
+) {
   if (!user?.station_id) return '근무지 미지정';
+  if (stationName) return stationName.replace(/역$/, '');
   if (user.name.endsWith(' 역무원')) return user.name.replace(/ 역무원$/, '');
   return user.station_id;
 }
@@ -157,6 +125,7 @@ export function StaffQueueScreen() {
   const [seenRequestKeys, setSeenRequestKeys] = useState<Set<string>>(new Set());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const requestsQuery = useSupportRequests(user?.role === 'staff');
+  const stationsQuery = useStations();
   const { refetch } = requestsQuery;
 
   useEffect(() => {
@@ -244,7 +213,8 @@ export function StaffQueueScreen() {
     return <ErrorView message="역무원 권한이 필요합니다." />;
   }
 
-  const stationDisplayName = getStaffStationDisplayName(user);
+  const staffStation = stationsQuery.data?.find((station) => station.id === user?.station_id);
+  const stationDisplayName = getStaffStationDisplayName(user, staffStation?.name);
   const stationLineMetas = getStationLineMetas(stationDisplayName, user?.station_id);
 
   return (

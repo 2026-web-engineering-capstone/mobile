@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,11 +13,8 @@ import {
   Screen,
   SectionLabel,
   StationChipDS,
-  ToggleChip,
   WheelchairIcon,
   CompanionIcon,
-  TrainIcon,
-  BellIcon,
 } from '@/components/ui';
 import { BRAND_TOKENS, FONT_FAMILY, RADIUS } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/api/client';
@@ -44,18 +41,6 @@ const ROLE_OPTIONS: RoleOption[] = [
     label: '역무원',
     tagline: '들어온 지원 요청을 현장에서 처리합니다',
     icon: (color) => <CompanionIcon color={color} size={22} />,
-  },
-  {
-    role: 'driver',
-    label: '기관사',
-    tagline: '교통약자 승차 알림을 받습니다',
-    icon: (color) => <TrainIcon color={color} size={22} />,
-  },
-  {
-    role: 'admin',
-    label: '관리자',
-    tagline: '로그와 처리 시간을 모니터링합니다',
-    icon: (color) => <BellIcon color={color} size={22} />,
   },
 ];
 
@@ -297,11 +282,11 @@ export function SignInScreen() {
           {ROLE_OPTIONS.map((option) => {
             const selected = option.role === selectedRole;
             return (
-              <ToggleChip
+              <RoleRadioButton
                 key={option.role}
                 icon={option.icon(selected ? BRAND_TOKENS.textOnDark : BRAND_TOKENS.text)}
                 label={option.label}
-                sub={option.tagline}
+                tagline={option.tagline}
                 selected={selected}
                 onPress={() => handleSelectRole(option.role)}
               />
@@ -349,5 +334,96 @@ export function SignInScreen() {
         </View>
       </ScrollView>
     </Screen>
+  );
+}
+
+function RoleRadioButton({
+  icon,
+  label,
+  tagline,
+  selected,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  tagline: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        borderRadius: RADIUS.chip,
+        backgroundColor: selected ? BRAND_TOKENS.brandLight : BRAND_TOKENS.surface,
+        borderWidth: 2,
+        borderColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.border,
+        opacity: pressed ? 0.92 : 1,
+      })}
+    >
+      <View
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          borderWidth: 2,
+          borderColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.borderStrong,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {selected ? (
+          <View
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: BRAND_TOKENS.brand,
+            }}
+          />
+        ) : null}
+      </View>
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: RADIUS.sm,
+          backgroundColor: selected ? BRAND_TOKENS.brand : BRAND_TOKENS.surfaceAlt,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {icon}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontFamily: FONT_FAMILY,
+            fontSize: 15,
+            fontWeight: '700',
+            color: BRAND_TOKENS.text,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            marginTop: 3,
+            fontFamily: FONT_FAMILY,
+            fontSize: 12,
+            color: BRAND_TOKENS.textMuted,
+          }}
+        >
+          {tagline}
+        </Text>
+      </View>
+    </Pressable>
   );
 }

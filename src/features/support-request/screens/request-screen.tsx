@@ -26,7 +26,13 @@ import {
   ToggleChip,
   SUPPORT_TYPE_ICONS,
 } from '@/components/ui';
-import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getLineMeta, getOfficialLineName } from '@/lib/design-tokens';
+import {
+  BRAND_TOKENS,
+  FONT_FAMILY,
+  RADIUS,
+  getStationLineMetas,
+  getOfficialLineName,
+} from '@/lib/design-tokens';
 import {
   useCreateSupportRequest,
   useStations,
@@ -55,7 +61,11 @@ export function RequestScreen() {
 
   const handleBackOrPrevStep = () => {
     if (step === 'stationPick') {
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(app)/(tabs)');
+      }
       return;
     }
     if (step === 'supportTypes') setStep('stationPick');
@@ -155,9 +165,11 @@ function StationPickStep({
   const [query, setQuery] = useState('');
   const stationsQuery = useStations(query.trim() || undefined);
   const stations = stationsQuery.data ?? [];
+  const allStationsQuery = useStations();
+  const allStations = allStationsQuery.data ?? [];
 
-  const depart = stations.find((s) => s.id === originStationId);
-  const arrive = stations.find((s) => s.id === destinationStationId);
+  const depart = allStations.find((s) => s.id === originStationId);
+  const arrive = allStations.find((s) => s.id === destinationStationId);
 
   const setStation = (station: Station) => {
     if (focus === 'depart') {
@@ -181,20 +193,17 @@ function StationPickStep({
 
   return (
     <>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
+      <View
+        style={{
           paddingHorizontal: 20,
           paddingTop: 8,
-          paddingBottom: 140,
+          paddingBottom: 14,
+          backgroundColor: BRAND_TOKENS.bg,
+          borderBottomWidth: 1,
+          borderBottomColor: BRAND_TOKENS.border,
         }}
-        keyboardShouldPersistTaps="handled"
       >
-        <PageTitle sub="출발할 역과 도착할 역을 선택해주세요.">
-          어디로 이동하시나요?
-        </PageTitle>
-
-        <View style={{ position: 'relative', marginBottom: 20 }}>
+        <View style={{ position: 'relative', marginBottom: 14 }}>
           <SlotRow
             label="출발"
             station={depart}
@@ -241,8 +250,19 @@ function StationPickStep({
           placeholder="역 이름 검색"
           onClear={() => setQuery('')}
         />
-
-        <View style={{ height: 16 }} />
+      </View>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 140,
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <PageTitle sub="출발할 역과 도착할 역을 선택해주세요.">
+          어디로 이동하시나요?
+        </PageTitle>
         <SectionLabel>
           {query ? `검색 결과 (${stations.length})` : '전체 역'}
         </SectionLabel>
@@ -264,7 +284,14 @@ function StationPickStep({
               key={s.id}
               station={s}
               size="sm"
-              selected={(focus === 'depart' ? depart : arrive)?.id === s.id}
+              selected={s.id === originStationId || s.id === destinationStationId}
+              label={
+                s.id === originStationId
+                  ? '출발역'
+                  : s.id === destinationStationId
+                    ? '도착역'
+                    : undefined
+              }
               onPress={() => setStation(s)}
             />
           ))}
@@ -293,7 +320,7 @@ function SlotRow({
   onPress: () => void;
   placeholder: string;
 }) {
-  const lineMeta = station ? getLineMeta(station.line) : null;
+  const lineMeta = station ? getStationLineMetas(station.line, station.id)[0] : null;
   const lineName = station ? getOfficialLineName(station.line) : '';
   return (
     <Pressable
@@ -784,7 +811,7 @@ function ReviewRow({
 }
 
 function RouteEnd({ type, station }: { type: '출발' | '도착'; station: Station }) {
-  const lineMeta = getLineMeta(station.line);
+  const lineMeta = getStationLineMetas(station.line, station.id)[0];
   const lineName = getOfficialLineName(station.line);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

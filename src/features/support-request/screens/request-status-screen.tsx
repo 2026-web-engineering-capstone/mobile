@@ -31,7 +31,8 @@ import {
   SectionLabel,
   StatusChip,
 } from '@/components/ui';
-import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getLineMeta } from '@/lib/design-tokens';
+import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getStationLineMetas } from '@/lib/design-tokens';
+import { formatKoreanTime } from '@/lib/datetime';
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/providers/auth-provider';
 import {
@@ -58,14 +59,7 @@ import {
 import { MEETING_POINT_LABELS, SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
 
 function formatTime(iso: string | null | undefined) {
-  if (!iso) return '';
-  const date = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatKoreanTime(iso);
 }
 
 const PROGRESS_DESCRIPTIONS: Record<SupportRequestStatus, string> = {
@@ -104,7 +98,13 @@ export function RequestStatusScreen() {
         <GyoumAppBar
           title="요청 상세"
           topInset={insets.top}
-          onBack={() => router.back()}
+          onBack={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(app)/(tabs)');
+            }
+          }}
         />
         <PassengerLikeBody insets={insets} request={request} hideCancel />
       </Screen>
@@ -121,7 +121,13 @@ export function RequestStatusScreen() {
       <GyoumAppBar
         title="진행 상황"
         topInset={insets.top}
-        onBack={() => router.replace('/(app)/(tabs)/history')}
+        onBack={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(app)/(tabs)/history');
+          }
+        }}
         trailing={<StatusChip status={request.status} size="sm" />}
       />
       <PassengerLikeBody insets={insets} request={request} />
@@ -736,8 +742,14 @@ function TimelineStep({
 }
 
 function DetailsCard({ request }: { request: SupportRequestDetail }) {
-  const originLine = getLineMeta(request.origin_station_id);
-  const destLine = getLineMeta(request.destination_station_id);
+  const originLine = getStationLineMetas(
+    request.origin_station_name,
+    request.origin_station_id,
+  )[0];
+  const destLine = getStationLineMetas(
+    request.destination_station_name,
+    request.destination_station_id,
+  )[0];
   return (
     <View>
       <SectionLabel>요청 정보</SectionLabel>

@@ -96,7 +96,11 @@ export function RequestDetailScreen() {
   const handleBackToQueue = () => {
     cacheSupportRequestInList(queryClient, request);
     void queryClient.invalidateQueries({ queryKey: queryKeys.supportRequests.all });
-    router.replace('/(app)/(tabs)');
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(app)/(tabs)');
+    }
   };
 
   return (
@@ -257,8 +261,6 @@ export function RequestDetailScreen() {
                 padding: 12,
                 backgroundColor: BRAND_TOKENS.surfaceAlt,
                 borderRadius: 10,
-                borderLeftWidth: 3,
-                borderLeftColor: BRAND_TOKENS.accent,
               }}
             >
               <Text
@@ -346,7 +348,7 @@ function RoutePoint({
   stationName: string;
   stationId: string;
 }) {
-  const lineMetas = getStationLineMetas(stationName);
+  const lineMetas = getStationLineMetas(stationName, stationId);
   return (
     <View
       style={{
