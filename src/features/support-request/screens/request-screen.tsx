@@ -283,7 +283,6 @@ function StationPickStep({
             <StationChipDS
               key={s.id}
               station={s}
-              size="sm"
               selected={s.id === originStationId || s.id === destinationStationId}
               label={
                 s.id === originStationId

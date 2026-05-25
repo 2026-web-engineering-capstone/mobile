@@ -30,6 +30,21 @@ export function formatKoreanTime(value: string | null | undefined) {
   });
 }
 
+export function formatKoreanDateTimeCompact(value: string | null | undefined) {
+  if (!value) return '';
+  const date = parseApiDate(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const dateLabel = date.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+  });
+
+  return `${dateLabel} ${formatKoreanTime(value)}`;
+}
+
 export function elapsedMinutesFromApiDate(value: string, nowMs = Date.now()) {
   const created = parseApiDate(value).getTime();
   if (Number.isNaN(created)) return 0;

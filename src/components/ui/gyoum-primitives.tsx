@@ -39,10 +39,12 @@ export function LineBadge({
 }: LineBadgeProps) {
   const inverted = color === 'white' || color === BRAND_TOKENS.onBrand100 || color === '#fff';
   const labelLength = char.length;
-  const displayLabel = labelLength >= 4 ? `${char.slice(0, 2)}\n${char.slice(2)}` : char;
+  const keepOnOneLine = char.includes('-');
+  const displayLabel =
+    !keepOnOneLine && labelLength >= 4 ? `${char.slice(0, 2)}\n${char.slice(2)}` : char;
   const fontScale =
-    labelLength >= 4 ? 0.26 : labelLength === 3 ? 0.25 : labelLength === 2 ? 0.32 : 0.5;
-  const lineCount = labelLength >= 4 ? 2 : 1;
+    keepOnOneLine ? 0.2 : labelLength >= 4 ? 0.26 : labelLength === 3 ? 0.25 : labelLength === 2 ? 0.32 : 0.5;
+  const lineCount = !keepOnOneLine && labelLength >= 4 ? 2 : 1;
   return (
     <View
       style={{

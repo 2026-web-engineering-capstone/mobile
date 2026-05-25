@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BRAND_TOKENS, RADIUS, pretendard } from '@/lib/design-tokens';
 import { GyoumCard } from '@/components/ui/gyoum-primitives';
@@ -15,18 +15,21 @@ import {
 import { SUPPORT_TYPE_LABELS } from '@/features/support-request/store/use-request-draft-store';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import { formatKoreanDateTime, parseApiDate } from '@/lib/datetime';
-import {
-  SUPPORT_REQUEST_STATUS_LABELS,
-  TERMINAL_REQUEST_STATUSES,
-} from '@/features/support-request/types';
+import { TERMINAL_REQUEST_STATUSES } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
 type HistoryFilter = 'active' | 'completed' | 'cancelled';
 
+function isHistoryFilter(value: unknown): value is HistoryFilter {
+  return value === 'active' || value === 'completed' || value === 'cancelled';
+}
+
 export function HistoryScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ filter?: string }>();
   const { role } = useAuth();
-  const [selectedFilter, setSelectedFilter] = useState<HistoryFilter>('active');
+  const initialFilter = isHistoryFilter(params.filter) ? params.filter : 'active';
+  const [selectedFilter, setSelectedFilter] = useState<HistoryFilter>(initialFilter);
   const isPassenger = role === 'passenger';
   const { data = [], isLoading, error, refetch } = useSupportRequests(
     isPassenger,
@@ -191,11 +194,7 @@ export function HistoryScreen() {
                         : `/(app)/support/${item.id}`,
                     )
                   }
-                  subtitle={
-                    selectedFilter === 'active'
-                      ? SUPPORT_REQUEST_STATUS_LABELS[item.status]
-                      : formatKoreanDateTime(item.created_at)
-                  }
+                  subtitle={formatKoreanDateTime(item.created_at)}
                 />
               ))
             )}

@@ -29,6 +29,7 @@ import {
   useUpdateSupportRequestStatus,
 } from '@/features/support-request/hooks/use-support-requests';
 import { useStationArrivals } from '@/features/transit/hooks/use-station-arrivals';
+import { getLiveEtaLabel } from '@/features/transit/utils/arrival-time';
 import { canStaffManageSupportRequest } from '@/features/support-request/types';
 import type { ArrivalTrain } from '@/features/transit/types';
 import { useAuth } from '@/providers/auth-provider';
@@ -69,6 +70,7 @@ export function StaffBoardingScreen() {
   const [carNumber, setCarNumber] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const shouldReturnToQueueAfterBoarding = Boolean(
     request?.status === 'boarded' && request.assigned_staff_id === user?.id,
   );
@@ -78,6 +80,11 @@ export function StaffBoardingScreen() {
       router.replace('/(app)/(tabs)');
     }
   }, [router, shouldReturnToQueueAfterBoarding]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const trainSuggestions = useMemo(() => {
     const trains = arrivalsQuery.data?.trains ?? [];
@@ -241,7 +248,7 @@ export function StaffBoardingScreen() {
                   >
                     {loadedRequest.origin_station_name} · {getTrainDirectionLabel(train)}
                   </Text>
-                  {train.etaMessage ? (
+                  {arrivalsQuery.data ? (
                     <Text
                       style={{
                         fontFamily: FONT_FAMILY,
@@ -251,7 +258,7 @@ export function StaffBoardingScreen() {
                       }}
                       numberOfLines={1}
                     >
-                      {train.etaMessage}
+                      {getLiveEtaLabel(train, arrivalsQuery.data.fetchedAt, nowMs)}
                     </Text>
                   ) : null}
                 </Pressable>

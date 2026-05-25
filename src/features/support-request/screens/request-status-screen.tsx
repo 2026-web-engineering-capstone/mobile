@@ -32,7 +32,7 @@ import {
   StatusChip,
 } from '@/components/ui';
 import { BRAND_TOKENS, FONT_FAMILY, RADIUS, getStationLineMetas } from '@/lib/design-tokens';
-import { formatKoreanTime } from '@/lib/datetime';
+import { formatKoreanDateTimeCompact, formatKoreanTime } from '@/lib/datetime';
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/providers/auth-provider';
 import {
@@ -60,6 +60,10 @@ import { MEETING_POINT_LABELS, SUPPORT_TYPE_LABELS } from '@/features/support-re
 
 function formatTime(iso: string | null | undefined) {
   return formatKoreanTime(iso);
+}
+
+function formatDateTime(iso: string | null | undefined) {
+  return formatKoreanDateTimeCompact(iso);
 }
 
 const PROGRESS_DESCRIPTIONS: Record<SupportRequestStatus, string> = {
@@ -244,7 +248,12 @@ function PassengerLikeBody({
           ) : (
             <GyoumCTA
               variant="primary"
-              onPress={() => router.replace('/(app)/(tabs)')}
+              onPress={() =>
+                router.replace({
+                  pathname: '/(app)/(tabs)/history',
+                  params: { filter: 'completed' },
+                })
+              }
             >
               완료
             </GyoumCTA>
@@ -285,14 +294,15 @@ function SummaryCard({ request }: { request: SupportRequestDetail }) {
           지원 요청
         </Text>
         <Text
-          style={{
-            fontFamily: FONT_FAMILY,
-            fontSize: 12,
-            color: BRAND_TOKENS.onBrand60,
-          }}
-        >
-          {formatTime(request.created_at)}
-        </Text>
+            style={{
+              fontFamily: FONT_FAMILY,
+              fontSize: 11,
+              color: BRAND_TOKENS.onBrand60,
+            }}
+            numberOfLines={1}
+          >
+          {formatDateTime(request.created_at)}
+          </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <View>
@@ -317,7 +327,9 @@ function SummaryCard({ request }: { request: SupportRequestDetail }) {
             {request.origin_station_name}
           </Text>
         </View>
-        <ArrowRightIcon color={BRAND_TOKENS.onBrand70} size={20} />
+        <View style={{ marginTop: 13 }}>
+          <ArrowRightIcon color={BRAND_TOKENS.onBrand70} size={20} />
+        </View>
         <View>
           <Text
             style={{
@@ -719,7 +731,13 @@ function TimelineStep({
           </Text>
           {time ? (
             <Text
-              style={{ fontFamily: FONT_FAMILY, fontSize: 12, color: BRAND_TOKENS.textMuted }}
+              style={{
+                fontFamily: FONT_FAMILY,
+                fontSize: 11,
+                color: BRAND_TOKENS.textMuted,
+                textAlign: 'right',
+              }}
+              numberOfLines={1}
             >
               {time}
             </Text>
@@ -831,35 +849,6 @@ function DetailsCard({ request }: { request: SupportRequestDetail }) {
             </View>
           ) : null}
         </View>
-        {request.assigned_staff_name ? (
-          <>
-            <Divider />
-            <View style={{ padding: 18 }}>
-              <Text
-                style={{
-                  fontFamily: FONT_FAMILY,
-                  fontSize: 12,
-                  color: BRAND_TOKENS.textMuted,
-                  fontWeight: '600',
-                  letterSpacing: 0.4,
-                  marginBottom: 8,
-                }}
-              >
-                담당 역무원
-              </Text>
-              <Text
-                style={{
-                  fontFamily: FONT_FAMILY,
-                  fontSize: 15,
-                  color: BRAND_TOKENS.text,
-                  fontWeight: '500',
-                }}
-              >
-                {request.assigned_staff_name}
-              </Text>
-            </View>
-          </>
-        ) : null}
       </GyoumCard>
     </View>
   );
