@@ -106,7 +106,7 @@ export function LiveFacilitiesSection({
       {!isLoading && !error && data && data.facilities.length === 0 ? (
         <GyoumCard padding={16}>
           <Text style={{ fontSize: 14, color: BRAND_TOKENS.textMuted }}>
-            공개된 편의시설 정보가 없습니다.
+            공개된 교통약자 시설 정보가 없습니다.
           </Text>
         </GyoumCard>
       ) : null}

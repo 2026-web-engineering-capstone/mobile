@@ -4,7 +4,7 @@
  * 단계: stationPick(출발/도착) → supportTypes(다중 선택) → meeting(만남위치+메모) → review(확인).
  * 제출 후 라우터로 `/support/status/[requestId]`로 이동.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -48,8 +48,19 @@ import {
 } from '@/features/support-request/store/use-request-draft-store';
 import { ApiError } from '@/lib/api/client';
 import type { Station } from '@/lib/api/types';
+import { STATION_CATALOG } from '@/features/home/data/station-catalog';
+import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
+import { findNearestStation } from '@/features/home/lib/find-nearest-station';
 
 type Step = 'stationPick' | 'supportTypes' | 'meeting' | 'review';
+
+function normalizeStationName(name: string) {
+  return name.replace(/\s+/g, '').replace(/역$/, '');
+}
+
+function normalizeStationLine(line: string) {
+  return getOfficialLineName(line).replace(/\s+/g, '');
+}
 
 export function RequestScreen() {
   const router = useRouter();
@@ -163,20 +174,87 @@ function StationPickStep({
     originStationId ? 'arrive' : 'depart',
   );
   const [query, setQuery] = useState('');
+  const [hasEditedOriginManually, setHasEditedOriginManually] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const stationLayouts = useRef<Record<string, { height: number; y: number }>>({});
+  const stationListOffsetY = useRef(0);
+  const [pendingScrollStationId, setPendingScrollStationId] = useState('');
+  const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
+  const listTopPadding = 16;
+  const bottomActionHeight = 140;
+  const selectedCardTopOffsetCards = 1;
   const stationsQuery = useStations(query.trim() || undefined);
   const stations = stationsQuery.data ?? [];
   const allStationsQuery = useStations();
   const allStations = allStationsQuery.data ?? [];
+  const { currentLocation } = useCurrentLocation(!hasEditedOriginManually);
 
   const depart = allStations.find((s) => s.id === originStationId);
   const arrive = allStations.find((s) => s.id === destinationStationId);
 
+  useEffect(() => {
+    if (!originStationId && !destinationStationId && focus !== 'depart') {
+      setFocus('depart');
+    }
+  }, [destinationStationId, focus, originStationId]);
+
+  useEffect(() => {
+    if (!pendingScrollStationId) return;
+    scrollToMeasuredStation(pendingScrollStationId);
+  }, [pendingScrollStationId, scrollViewportHeight, stations]);
+
+  useEffect(() => {
+    if (
+      hasEditedOriginManually ||
+      !currentLocation ||
+      allStations.length === 0
+    ) return;
+    const nearest = findNearestStation(currentLocation, STATION_CATALOG);
+    if (!nearest) return;
+    const nearestName = normalizeStationName(nearest.name);
+    const nearestLine = normalizeStationLine(nearest.line.label);
+    const station =
+      allStations.find(
+        (item) =>
+          normalizeStationName(item.name) === nearestName &&
+          normalizeStationLine(item.line) === nearestLine,
+      ) ??
+      allStations.find((item) => normalizeStationName(item.name) === nearestName);
+    if (!station || station.id === destinationStationId) return;
+    if (originStationId === station.id) return;
+    if (originStationId && destinationStationId) return;
+    setOriginStationId(station.id);
+    setFocus('arrive');
+  }, [
+    allStations,
+    currentLocation,
+    destinationStationId,
+    hasEditedOriginManually,
+    originStationId,
+    setOriginStationId,
+  ]);
+
   const setStation = (station: Station) => {
+    if (station.id === originStationId) {
+      setHasEditedOriginManually(true);
+      setOriginStationId('');
+      setFocus('depart');
+      setQuery('');
+      return;
+    }
+    if (station.id === destinationStationId) {
+      setDestinationStationId('');
+      setFocus('arrive');
+      setQuery('');
+      return;
+    }
     if (focus === 'depart') {
+      setHasEditedOriginManually(true);
       setOriginStationId(station.id);
       setFocus('arrive');
     } else {
       setDestinationStationId(station.id);
+      if (!originStationId) setFocus('depart');
     }
     setQuery('');
   };
@@ -184,6 +262,33 @@ function StationPickStep({
   const swap = () => {
     setOriginStationId(destinationStationId);
     setDestinationStationId(originStationId);
+  };
+
+  const scrollToStationCard = (station?: Station) => {
+    if (!station) return;
+    setQuery('');
+    setPendingScrollStationId(station.id);
+  };
+
+  const handleSlotPress = (nextFocus: 'depart' | 'arrive', station?: Station) => {
+    setFocus(nextFocus);
+    scrollToStationCard(station);
+  };
+
+  const scrollToMeasuredStation = (stationId: string) => {
+    const layout = stationLayouts.current[stationId];
+    if (!layout || scrollViewportHeight <= 0) return;
+    const selectedTopOffset = layout.height * selectedCardTopOffsetCards + 12;
+    const scrollY = stationListOffsetY.current + layout.y - listTopPadding - selectedTopOffset;
+    scrollRef.current?.scrollTo({ y: Math.max(0, scrollY), animated: true });
+    setPendingScrollStationId('');
+  };
+
+  const handleStationLayout = (stationId: string, y: number, height: number) => {
+    stationLayouts.current[stationId] = { height, y };
+    if (pendingScrollStationId === stationId) {
+      scrollToMeasuredStation(stationId);
+    }
   };
 
   const canNext =
@@ -208,7 +313,7 @@ function StationPickStep({
             label="출발"
             station={depart}
             focused={focus === 'depart'}
-            onPress={() => setFocus('depart')}
+            onPress={() => handleSlotPress('depart', depart)}
             placeholder="출발 역 선택"
           />
           <View style={{ height: 8 }} />
@@ -216,7 +321,7 @@ function StationPickStep({
             label="도착"
             station={arrive}
             focused={focus === 'arrive'}
-            onPress={() => setFocus('arrive')}
+            onPress={() => handleSlotPress('arrive', arrive)}
             placeholder="도착 역 선택"
           />
           <Pressable
@@ -252,11 +357,13 @@ function StationPickStep({
         />
       </View>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
+        onLayout={(event) => setScrollViewportHeight(event.nativeEvent.layout.height)}
         contentContainerStyle={{
           paddingHorizontal: 20,
-          paddingTop: 16,
-          paddingBottom: 140,
+          paddingTop: listTopPadding,
+          paddingBottom: bottomActionHeight,
         }}
         keyboardShouldPersistTaps="handled"
       >
@@ -266,7 +373,12 @@ function StationPickStep({
         <SectionLabel>
           {query ? `검색 결과 (${stations.length})` : '전체 역'}
         </SectionLabel>
-        <View style={{ gap: 8 }}>
+        <View
+          style={{ gap: 8 }}
+          onLayout={(event) => {
+            stationListOffsetY.current = event.nativeEvent.layout.y;
+          }}
+        >
           {stationsQuery.isLoading ? (
             <Text
               style={{
@@ -279,21 +391,35 @@ function StationPickStep({
               불러오는 중...
             </Text>
           ) : null}
-          {stations.map((s) => (
-            <StationChipDS
-              key={s.id}
-              station={s}
-              selected={s.id === originStationId || s.id === destinationStationId}
-              label={
-                s.id === originStationId
-                  ? '출발역'
-                  : s.id === destinationStationId
-                    ? '도착역'
-                    : undefined
-              }
-              onPress={() => setStation(s)}
-            />
-          ))}
+          {stations.map((s) => {
+            const isOrigin = s.id === originStationId;
+            const isDestination = s.id === destinationStationId;
+            return (
+              <View
+                key={s.id}
+                onLayout={(event) =>
+                  handleStationLayout(
+                    s.id,
+                    event.nativeEvent.layout.y,
+                    event.nativeEvent.layout.height,
+                  )
+                }
+              >
+                <StationChipDS
+                  station={s}
+                  selected={isOrigin || isDestination}
+                  label={
+                    isOrigin
+                      ? '출발역'
+                      : isDestination
+                        ? '도착역'
+                        : undefined
+                  }
+                  onPress={() => setStation(s)}
+                />
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
 

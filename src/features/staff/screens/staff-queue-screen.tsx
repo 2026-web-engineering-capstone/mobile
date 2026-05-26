@@ -26,6 +26,7 @@ import {
 import {
   BRAND_TOKENS,
   FONT_FAMILY,
+  RADIUS,
   getStationLineMetas,
   type LineMeta,
 } from '@/lib/design-tokens';
@@ -219,6 +220,7 @@ export function StaffQueueScreen() {
   const staffStation = stationsQuery.data?.find((station) => station.id === user?.station_id);
   const stationDisplayName = getStaffStationDisplayName(user, staffStation?.name);
   const stationLineMetas = getStationLineMetas(stationDisplayName, user?.station_id);
+  const stationLineLabel = formatLineLabelText(stationLineMetas[0]);
 
   return (
     <Screen
@@ -305,72 +307,106 @@ export function StaffQueueScreen() {
             gap: 16,
           }}
         >
-          {/* 근무 정보 카드 (어두운) */}
+          {/* 근무 정보 카드 */}
           <GyoumCard
-            padding={16}
-            style={{ backgroundColor: BRAND_TOKENS.text, borderColor: BRAND_TOKENS.text }}
+            padding={0}
+            style={{
+              backgroundColor: BRAND_TOKENS.text,
+              borderColor: BRAND_TOKENS.text,
+              overflow: 'hidden',
+            }}
           >
             <View
               style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 12,
+                paddingHorizontal: 18,
+                paddingTop: 18,
+                paddingBottom: 16,
               }}
             >
-              <Text
+              <View
                 style={{
-                  fontFamily: FONT_FAMILY,
-                  fontSize: 12,
-                  color: BRAND_TOKENS.onBrand60,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 14,
                 }}
               >
-                오늘 근무
-              </Text>
-              <Text
-                style={{
-                  fontFamily: FONT_FAMILY,
-                  fontSize: 12,
-                  color: BRAND_TOKENS.onBrand60,
-                }}
-              >
-                역무원 모드
-              </Text>
-            </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 12,
-                marginBottom: 14,
-              }}
-            >
-              <StationLineBadges lines={stationLineMetas} size={30} />
-              <View>
                 <Text
                   style={{
                     fontFamily: FONT_FAMILY,
-                    fontSize: 18,
-                    fontWeight: '700',
-                    color: BRAND_TOKENS.onBrand100,
+                    fontSize: 12,
+                    color: BRAND_TOKENS.onBrand60,
                   }}
                 >
-                  {stationDisplayName}
+                  오늘 근무
                 </Text>
+                <View
+                  style={{
+                    borderRadius: RADIUS.pill,
+                    backgroundColor: BRAND_TOKENS.onBrand10,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: FONT_FAMILY,
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: BRAND_TOKENS.onBrand85,
+                    }}
+                  >
+                    역무원 모드
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <StationLineBadges lines={stationLineMetas} size={42} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontFamily: FONT_FAMILY,
+                      fontSize: 23,
+                      fontWeight: '800',
+                      color: BRAND_TOKENS.onBrand100,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {stationDisplayName}
+                  </Text>
+                  {stationLineLabel ? (
+                    <Text
+                      style={{
+                        fontFamily: FONT_FAMILY,
+                        fontSize: 13,
+                        fontWeight: '600',
+                        color: BRAND_TOKENS.onBrand60,
+                        marginTop: 3,
+                      }}
+                    >
+                      {stationLineLabel}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             </View>
             <View
               style={{
                 flexDirection: 'row',
-                gap: 1,
-                backgroundColor: BRAND_TOKENS.onBrand10,
-                borderRadius: 10,
-                overflow: 'hidden',
+                gap: 8,
+                paddingHorizontal: 12,
+                paddingBottom: 12,
               }}
             >
-              <StatBlock label="대기" value={waitingCount} accent />
-              <StatBlock label="처리 중" value={processingCount} />
-              <StatBlock label="오늘 완료" value={done.length} />
+              <StatBlock label="대기" value={waitingCount} tone="waiting" />
+              <StatBlock label="처리 중" value={processingCount} tone="processing" />
+              <StatBlock label="오늘 완료" value={done.length} tone="done" />
             </View>
           </GyoumCard>
 
@@ -439,18 +475,37 @@ export function StaffQueueScreen() {
 function StatBlock({
   label,
   value,
-  accent,
+  tone,
 }: {
   label: string;
   value: number;
-  accent?: boolean;
+  tone: 'done' | 'processing' | 'waiting';
 }) {
+  const toneStyle = {
+    waiting: {
+      backgroundColor: 'rgba(255,122,89,0.16)',
+      labelColor: 'rgba(255,214,204,0.78)',
+      valueColor: BRAND_TOKENS.accent,
+    },
+    processing: {
+      backgroundColor: 'rgba(44,95,207,0.22)',
+      labelColor: 'rgba(206,221,255,0.78)',
+      valueColor: '#8FB4FF',
+    },
+    done: {
+      backgroundColor: 'rgba(6,180,122,0.18)',
+      labelColor: 'rgba(207,247,232,0.78)',
+      valueColor: BRAND_TOKENS.success,
+    },
+  }[tone];
+
   return (
     <View
       style={{
         flex: 1,
-        paddingVertical: 10,
-        backgroundColor: '#000',
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: toneStyle.backgroundColor,
         alignItems: 'center',
       }}
     >
@@ -458,7 +513,7 @@ function StatBlock({
         style={{
           fontFamily: FONT_FAMILY,
           fontSize: 11,
-          color: BRAND_TOKENS.onBrand50,
+          color: toneStyle.labelColor,
           marginBottom: 4,
         }}
       >
@@ -467,9 +522,9 @@ function StatBlock({
       <Text
         style={{
           fontFamily: FONT_FAMILY,
-          fontSize: 22,
-          fontWeight: '700',
-          color: accent ? BRAND_TOKENS.accent : BRAND_TOKENS.onBrand100,
+          fontSize: 24,
+          fontWeight: '800',
+          color: toneStyle.valueColor,
         }}
       >
         {value}
@@ -787,8 +842,12 @@ function QueueStatusPill({
   );
 }
 
-function formatLineBadgeText(line: LineMeta) {
-  return /^[1-9]$/.test(line.char) ? `${line.char}호선` : line.char;
+function formatLineLabelText(line?: LineMeta) {
+  if (!line) return '';
+  if (/^[1-9]$/.test(line.char)) return `${line.char}호선`;
+  if (line.char === '인천1') return '인천1호선';
+  if (line.char === '인천2') return '인천2호선';
+  return line.char;
 }
 
 function StationLineBadges({
@@ -803,7 +862,7 @@ function StationLineBadges({
       {lines.map((line, index) => (
         <LineBadge
           key={`${line.char}-${line.color}-${index}`}
-          char={formatLineBadgeText(line)}
+          char={line.char}
           color={line.color}
           size={size}
         />

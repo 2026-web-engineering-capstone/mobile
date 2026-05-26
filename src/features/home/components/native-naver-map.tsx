@@ -36,7 +36,7 @@ export function NativeNaverMap({
       return;
     }
 
-    mapRef.current.setLocationTrackingMode('NoFollow');
+    mapRef.current.setLocationTrackingMode('None');
     mapRef.current.animateCameraTo({
       latitude: currentLocation.latitude,
       longitude: currentLocation.longitude,
@@ -55,11 +55,13 @@ export function NativeNaverMap({
       isShowScaleBar={false}
       isShowZoomControls={false}
       onInitialized={() => {
-        mapRef.current?.setLocationTrackingMode('NoFollow');
+        mapRef.current?.setLocationTrackingMode('None');
       }}
       locationOverlay={{
         isVisible: Boolean(currentLocation),
         position: currentLocation ?? undefined,
+        anchor: { x: 0.5, y: 0.5 },
+        circleRadius: 0,
       }}
       layerGroups={{
         BUILDING: true,
