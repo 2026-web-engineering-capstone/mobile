@@ -83,6 +83,8 @@ const config: ExpoConfig = {
       'expo-build-properties',
       {
         android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
           extraMavenRepos: ['https://repository.map.naver.com/archive/maven'],
         },
       },
@@ -91,6 +93,8 @@ const config: ExpoConfig = {
     // ObjC pod인 GoogleUtilities를 import하려면 modular_headers 필요.
     // expo-build-properties 55에는 useModularHeaders 옵션이 없어 자체 plugin으로 처리.
     './plugins/with-use-modular-headers',
+    './plugins/with-async-storage-repo',
+    './plugins/with-firebase-notification-channel-fix',
     [
       'expo-notifications',
       {
