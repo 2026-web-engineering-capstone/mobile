@@ -308,11 +308,6 @@ function getLineNameFromStationId(stationId: string | null | undefined) {
     return SUBWAY_ID_LINES[subwayId];
   }
 
-  // Legacy seeded IDs without an explicit suffix are Seoul line 4 stations.
-  if (/^STN-[A-Z]{3}$/.test(stationId)) {
-    return '4호선';
-  }
-
   return null;
 }
 

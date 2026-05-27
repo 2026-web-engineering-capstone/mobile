@@ -3,11 +3,11 @@ import {
   type Coordinate,
   useCurrentLocation,
 } from '@/features/home/hooks/use-current-location';
-import type { StationInfo } from '@/features/home/types';
+import type { MapStation } from '@/features/home/types';
 
 type MapSectionProps = {
   routePath?: Coordinate[];
-  station: StationInfo;
+  station: MapStation;
 };
 
 function resolveNaverMapClientId() {
@@ -32,7 +32,7 @@ function resolveNaverMapClientId() {
 
 const NAVER_MAP_CLIENT_ID = resolveNaverMapClientId();
 
-function WebMapFallback({ station }: { station: StationInfo }) {
+function WebMapFallback({ station }: { station: MapStation }) {
   return (
     <View className="h-60 items-center justify-center rounded-2xl bg-default-100 px-6">
       <Text className="text-center text-base font-semibold text-foreground">

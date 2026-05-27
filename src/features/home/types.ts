@@ -1,16 +1,6 @@
-export type SubwayLineTheme = {
-  label: string;
-  colors: {
-    primary: string;
-    soft: string;
-  };
-};
-
-export type StationInfo = {
+export type MapStation = {
+  name: string;
   latitude: number;
   longitude: number;
-  name: string;
-  previous: string;
-  next: string;
-  line: SubwayLineTheme;
+  line_color: string;
 };

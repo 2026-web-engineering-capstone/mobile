@@ -4,10 +4,10 @@
  * 인사말 → 가까운 역 카드(네이버 지도 + 노선 뱃지) → 진행 중 요청 카드 → 코랄 CTA →
  * 즐겨찾기 경로 → 역 시설 안내 + 실시간 도착 정보.
  */
-import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Location from 'expo-location';
 import {
   BellIcon,
   ChevronRightIcon,
@@ -24,12 +24,8 @@ import {
 import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
 import { typo } from '@/lib/typography';
 import { MapSection } from '@/features/home/components/map-section';
-import {
-  DEFAULT_STATION,
-  STATION_CATALOG,
-} from '@/features/home/data/station-catalog';
 import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
-import { findNearestStation } from '@/features/home/lib/find-nearest-station';
+import { useNearestStations } from '@/features/home/hooks/use-nearest-stations';
 import { useSupportRequests } from '@/features/support-request/hooks/use-support-requests';
 import { useStationPreferencesStore } from '@/features/stations/store/use-station-preferences-store';
 import { LiveArrivalSection } from '@/features/transit/components/live-arrival-section';
@@ -40,17 +36,76 @@ import {
 } from '@/features/support-request/types';
 import { useAuth } from '@/providers/auth-provider';
 
+function LocationPermissionCard() {
+  const handleRequestPermission = async () => {
+    await Location.requestForegroundPermissionsAsync();
+  };
+
+  return (
+    <GyoumCard padding={24}>
+      <View style={{ alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: RADIUS.pill,
+            backgroundColor: BRAND_TOKENS.surfaceAlt,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>📍</Text>
+        </View>
+        <Text style={[typo('body-md'), { color: BRAND_TOKENS.text, textAlign: 'center' }]}>
+          현재 위치를 확인할 수 없습니다
+        </Text>
+        <Text style={[typo('body-sm'), { color: BRAND_TOKENS.textMuted, textAlign: 'center' }]}>
+          위치 권한을 허용하면 가장 가까운 역을 찾아드립니다
+        </Text>
+        <GyoumCTA variant="soft" onPress={handleRequestPermission}>
+          위치 권한 허용하기
+        </GyoumCTA>
+      </View>
+    </GyoumCard>
+  );
+}
+
+function NearestStationErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <GyoumCard padding={24}>
+      <View style={{ alignItems: 'center', gap: 12 }}>
+        <Text style={[typo('body-md'), { color: BRAND_TOKENS.danger, textAlign: 'center' }]}>
+          역 정보를 불러올 수 없습니다
+        </Text>
+        <Text style={[typo('body-sm'), { color: BRAND_TOKENS.textMuted, textAlign: 'center' }]}>
+          네트워크 연결을 확인하고 다시 시도해주세요
+        </Text>
+        <GyoumCTA variant="soft" onPress={onRetry}>
+          다시 시도
+        </GyoumCTA>
+      </View>
+    </GyoumCard>
+  );
+}
+
 export function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { data: requests = [] } = useSupportRequests(user?.role === 'passenger');
-  const { currentLocation } = useCurrentLocation();
+  const { currentLocation, errorMessage: locationError } = useCurrentLocation();
   const favoriteStations = useStationPreferencesStore((s) => s.favoriteStations);
 
-  const station = useMemo(() => {
-    if (!currentLocation) return DEFAULT_STATION;
-    return findNearestStation(currentLocation, STATION_CATALOG) ?? DEFAULT_STATION;
-  }, [currentLocation]);
+  const {
+    data: nearestStations,
+    isLoading: stationsLoading,
+    isError: stationsError,
+    refetch: refetchStations,
+  } = useNearestStations(
+    currentLocation?.latitude ?? null,
+    currentLocation?.longitude ?? null,
+  );
+
+  const station = nearestStations?.[0] ?? null;
 
   const activeRequest = requests.find(
     (request) =>
@@ -58,8 +113,10 @@ export function HomeScreen() {
       !TERMINAL_REQUEST_STATUSES.includes(request.status),
   );
 
-  const lineMeta = getLineMeta(station.line.label);
+  const lineMeta = station ? getLineMeta(station.line) : null;
   const userName = user?.name ?? '승객';
+
+  const hasLocation = currentLocation !== null;
 
   return (
     <Screen
@@ -123,66 +180,85 @@ export function HomeScreen() {
           </Text>
         </View>
 
-        {/* 가까운 역 카드 — 인디고 배경 + 네이버 지도 */}
-        <View
-          style={{
-            backgroundColor: BRAND_TOKENS.brand,
-            borderRadius: RADIUS.card,
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor: BRAND_TOKENS.brand,
-          }}
-        >
-          <MapSection station={station} />
-          <View style={{ padding: 18 }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 10,
-                marginBottom: 10,
-              }}
-            >
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: BRAND_TOKENS.success,
-                }}
-              />
-              <Text
-                style={[
-                  typo('meta'),
-                  { color: BRAND_TOKENS.textOnDark, opacity: 0.85 },
-                ]}
-              >
-                가장 가까운 역 · 지원 가능
+        {/* 가까운 역 카드 — 상태별 분기 */}
+        {!hasLocation && !locationError ? (
+          <LocationPermissionCard />
+        ) : locationError && !hasLocation ? (
+          <LocationPermissionCard />
+        ) : stationsError ? (
+          <NearestStationErrorCard onRetry={refetchStations} />
+        ) : stationsLoading || !station ? (
+          <GyoumCard padding={24}>
+            <View style={{ alignItems: 'center', gap: 12, paddingVertical: 20 }}>
+              <ActivityIndicator size="large" color={BRAND_TOKENS.brand} />
+              <Text style={[typo('body-sm'), { color: BRAND_TOKENS.textMuted }]}>
+                가까운 역을 찾고 있습니다…
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <LineBadge char={lineMeta.char} color="white" size={36} />
-              <View style={{ flex: 1 }}>
+          </GyoumCard>
+        ) : (
+          <View
+            style={{
+              backgroundColor: BRAND_TOKENS.brand,
+              borderRadius: RADIUS.card,
+              overflow: 'hidden',
+              borderWidth: 1,
+              borderColor: BRAND_TOKENS.brand,
+            }}
+          >
+            <MapSection station={station} />
+            <View style={{ padding: 18 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: BRAND_TOKENS.success,
+                  }}
+                />
                 <Text
                   style={[
-                    typo('number-lg'),
-                    { color: BRAND_TOKENS.textOnDark },
+                    typo('meta'),
+                    { color: BRAND_TOKENS.textOnDark, opacity: 0.85 },
                   ]}
                 >
-                  {station.name}
+                  가장 가까운 역 · 지원 가능
                 </Text>
-                <Text
-                  style={[
-                    typo('body-sm'),
-                    { color: BRAND_TOKENS.textOnDark, opacity: 0.75 },
-                  ]}
-                >
-                  {getOfficialLineName(station.line.label)}
-                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {lineMeta ? (
+                  <LineBadge char={lineMeta.char} color="white" size={36} />
+                ) : null}
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      typo('number-lg'),
+                      { color: BRAND_TOKENS.textOnDark },
+                    ]}
+                  >
+                    {station.name}
+                  </Text>
+                  <Text
+                    style={[
+                      typo('body-sm'),
+                      { color: BRAND_TOKENS.textOnDark, opacity: 0.75 },
+                    ]}
+                  >
+                    {getOfficialLineName(station.line)}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* 진행 중 요청 */}
         {activeRequest ? (
@@ -270,14 +346,16 @@ export function HomeScreen() {
           </View>
         ) : null}
 
-        {/* 실시간 도착 */}
-        <LiveArrivalSection stationName={station.name} />
-
-        {/* 역 시설 */}
-        <View>
-          <SectionLabel>역 시설 안내</SectionLabel>
-          <LiveFacilitiesSection stationName={station.name} />
-        </View>
+        {/* 실시간 도착 + 역 시설 — station이 있을 때만 */}
+        {station ? (
+          <>
+            <LiveArrivalSection stationName={station.name} />
+            <View>
+              <SectionLabel>역 시설 안내</SectionLabel>
+              <LiveFacilitiesSection stationName={station.name} />
+            </View>
+          </>
+        ) : null}
     </Screen>
   );
 }

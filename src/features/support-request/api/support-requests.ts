@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api/client';
-import type { Station } from '@/lib/api/types';
+import type { NearestStation, Station } from '@/lib/api/types';
 import type { MeetingPoint, SupportType } from '@/features/support-request/store/use-request-draft-store';
 import type {
   CancelReasonCode,
@@ -27,6 +27,12 @@ export type UploadSupportRequestCurrentLocationPayload = {
 export function listStations(query?: string) {
   const search = query ? `?query=${encodeURIComponent(query)}` : '';
   return apiFetch<Station[]>(`/stations${search}`);
+}
+
+export function listNearestStations(lat: number, lng: number, limit = 5) {
+  return apiFetch<NearestStation[]>(
+    `/stations/nearest?lat=${lat}&lng=${lng}&limit=${limit}`,
+  );
 }
 
 export function listSupportRequests() {

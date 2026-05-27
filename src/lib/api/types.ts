@@ -23,4 +23,16 @@ export type Station = {
   name: string;
   line: string;
   line_color: string;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+export type NearestStation = {
+  id: string;
+  name: string;
+  line: string;
+  line_color: string;
+  latitude: number;
+  longitude: number;
+  distance_km: number;
 };

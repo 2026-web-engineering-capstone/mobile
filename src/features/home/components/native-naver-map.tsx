@@ -5,12 +5,12 @@ import {
   type NaverMapViewRef,
 } from '@mj-studio/react-native-naver-map';
 import type { Coordinate } from '@/features/home/hooks/use-current-location';
-import type { StationInfo } from '@/features/home/types';
+import type { MapStation } from '@/features/home/types';
 
 type NativeNaverMapProps = {
   currentLocation: Coordinate | null;
   routePath?: Coordinate[];
-  station: StationInfo;
+  station: MapStation;
 };
 
 const DEFAULT_ZOOM = 12;
@@ -60,6 +60,7 @@ export function NativeNaverMap({
       locationOverlay={{
         isVisible: Boolean(currentLocation),
         position: currentLocation ?? undefined,
+        anchor: { x: 0.5, y: 0.5 },
       }}
       layerGroups={{
         BUILDING: true,
@@ -75,7 +76,7 @@ export function NativeNaverMap({
     >
       {routePath.length > 1 ? (
         <NaverMapPolylineOverlay
-          color={station.line.colors.primary}
+          color={station.line_color}
           coords={routePath}
           width={5}
         />
