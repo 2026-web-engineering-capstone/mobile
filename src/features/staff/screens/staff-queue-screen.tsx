@@ -28,6 +28,7 @@ import {
   FONT_FAMILY,
   RADIUS,
   getStationLineMetas,
+  pretendard,
   type LineMeta,
 } from '@/lib/design-tokens';
 import {
@@ -311,16 +312,16 @@ export function StaffQueueScreen() {
           <GyoumCard
             padding={0}
             style={{
-              backgroundColor: BRAND_TOKENS.text,
-              borderColor: BRAND_TOKENS.text,
+              backgroundColor: '#162238',
+              borderColor: '#263650',
               overflow: 'hidden',
             }}
           >
             <View
               style={{
-                paddingHorizontal: 18,
+                paddingHorizontal: 20,
                 paddingTop: 18,
-                paddingBottom: 16,
+                paddingBottom: 18,
               }}
             >
               <View
@@ -343,7 +344,7 @@ export function StaffQueueScreen() {
                 <View
                   style={{
                     borderRadius: RADIUS.pill,
-                    backgroundColor: BRAND_TOKENS.onBrand10,
+                    backgroundColor: 'rgba(255,255,255,0.12)',
                     paddingHorizontal: 10,
                     paddingVertical: 5,
                   }}
@@ -351,7 +352,7 @@ export function StaffQueueScreen() {
                   <Text
                     style={{
                       fontFamily: FONT_FAMILY,
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: '600',
                       color: BRAND_TOKENS.onBrand85,
                     }}
@@ -364,44 +365,54 @@ export function StaffQueueScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  gap: 12,
+                  justifyContent: 'space-between',
+                  gap: 14,
                 }}
               >
-                <StationLineBadges lines={stationLineMetas} size={42} />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontFamily: FONT_FAMILY,
-                      fontSize: 23,
-                      fontWeight: '800',
-                      color: BRAND_TOKENS.onBrand100,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {stationDisplayName}
-                  </Text>
-                  {stationLineLabel ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 14,
+                    flex: 1,
+                  }}
+                >
+                  <StationLineBadges lines={stationLineMetas} size={44} />
+                  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'flex-start' }}>
                     <Text
                       style={{
-                        fontFamily: FONT_FAMILY,
-                        fontSize: 13,
+                        fontFamily: pretendard('600'),
+                        fontSize: 20,
                         fontWeight: '600',
-                        color: BRAND_TOKENS.onBrand60,
-                        marginTop: 3,
+                        color: BRAND_TOKENS.onBrand100,
+                        letterSpacing: -0.16,
                       }}
+                      numberOfLines={1}
                     >
-                      {stationLineLabel}
+                      {stationDisplayName}
                     </Text>
-                  ) : null}
+                    {stationLineLabel ? (
+                      <Text
+                        style={{
+                          fontFamily: pretendard('500'),
+                          fontSize: 13,
+                          fontWeight: '500',
+                          color: BRAND_TOKENS.onBrand60,
+                          marginTop: 1,
+                        }}
+                      >
+                        {stationLineLabel}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               </View>
             </View>
             <View
               style={{
                 flexDirection: 'row',
-                gap: 8,
-                paddingHorizontal: 12,
-                paddingBottom: 12,
+                borderTopWidth: 1,
+                borderTopColor: BRAND_TOKENS.onBrand10,
               }}
             >
               <StatBlock label="대기" value={waitingCount} tone="waiting" />
@@ -483,19 +494,13 @@ function StatBlock({
 }) {
   const toneStyle = {
     waiting: {
-      backgroundColor: 'rgba(255,122,89,0.16)',
-      labelColor: 'rgba(255,214,204,0.78)',
-      valueColor: BRAND_TOKENS.accent,
+      valueColor: '#E06F54',
     },
     processing: {
-      backgroundColor: 'rgba(44,95,207,0.22)',
-      labelColor: 'rgba(206,221,255,0.78)',
-      valueColor: '#8FB4FF',
+      valueColor: '#6D8FD6',
     },
     done: {
-      backgroundColor: 'rgba(6,180,122,0.18)',
-      labelColor: 'rgba(207,247,232,0.78)',
-      valueColor: BRAND_TOKENS.success,
+      valueColor: '#4EAF8D',
     },
   }[tone];
 
@@ -503,9 +508,7 @@ function StatBlock({
     <View
       style={{
         flex: 1,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: toneStyle.backgroundColor,
+        paddingVertical: 14,
         alignItems: 'center',
       }}
     >
@@ -513,7 +516,7 @@ function StatBlock({
         style={{
           fontFamily: FONT_FAMILY,
           fontSize: 11,
-          color: toneStyle.labelColor,
+          color: BRAND_TOKENS.onBrand60,
           marginBottom: 4,
         }}
       >

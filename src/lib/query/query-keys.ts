@@ -16,6 +16,6 @@ export const queryKeys = {
     arrivals: (stationName: string) =>
       ['transit', 'arrivals', stationName] as const,
     facilities: (stationName: string) =>
-      ['transit', 'facilities', stationName] as const,
+      ['transit', 'facilities', 'seoul-accessible-v3', stationName] as const,
   },
 };
