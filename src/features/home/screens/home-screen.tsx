@@ -13,7 +13,6 @@ import {
   ChevronRightIcon,
   GyoumCTA,
   GyoumCard,
-  LineBadge,
   PlusIcon,
   PulseDot,
   Screen,
@@ -21,7 +20,7 @@ import {
   StarIcon,
   StatusChip,
 } from '@/components/ui';
-import { BRAND_TOKENS, RADIUS, getLineMeta, getOfficialLineName, pretendard } from '@/lib/design-tokens';
+import { BRAND_TOKENS, RADIUS, getOfficialLineName, getStationLineMetas, pretendard } from '@/lib/design-tokens';
 import { typo } from '@/lib/typography';
 import { MapSection } from '@/features/home/components/map-section';
 import { useCurrentLocation } from '@/features/home/hooks/use-current-location';
@@ -113,7 +112,11 @@ export function HomeScreen() {
       !TERMINAL_REQUEST_STATUSES.includes(request.status),
   );
 
-  const lineMeta = station ? getLineMeta(station.line) : null;
+  const allLineNames = station
+    ? getStationLineMetas(station.name, station.id)
+        .map((m) => getOfficialLineName(m.char))
+        .join('·')
+    : '';
   const userName = user?.name ?? '승객';
 
   const hasLocation = currentLocation !== null;
@@ -233,28 +236,23 @@ export function HomeScreen() {
                   가장 가까운 역 · 지원 가능
                 </Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                {lineMeta ? (
-                  <LineBadge char={lineMeta.char} color="white" size={36} />
-                ) : null}
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      typo('number-lg'),
-                      { color: BRAND_TOKENS.textOnDark },
-                    ]}
-                  >
-                    {station.name}
-                  </Text>
-                  <Text
-                    style={[
-                      typo('body-sm'),
-                      { color: BRAND_TOKENS.textOnDark, opacity: 0.75 },
-                    ]}
-                  >
-                    {getOfficialLineName(station.line)}
-                  </Text>
-                </View>
+              <View>
+                <Text
+                  style={[
+                    typo('number-lg'),
+                    { color: BRAND_TOKENS.textOnDark },
+                  ]}
+                >
+                  {station.name}
+                </Text>
+                <Text
+                  style={[
+                    typo('body-sm'),
+                    { color: BRAND_TOKENS.textOnDark, opacity: 0.75, marginTop: 2 },
+                  ]}
+                >
+                  {allLineNames}
+                </Text>
               </View>
             </View>
           </View>
